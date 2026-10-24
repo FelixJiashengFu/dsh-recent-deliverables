@@ -104,7 +104,7 @@ test/client.test.mjs 浏览器半的接线 + 转发助手单测：node test/clie
 
 ## npm 安装
 
-安装包名：`@jiashengfu/dsh-recent-deliverables`。在 DSH 的“设置 → 插件 → 添加插件 → 安装第三方插件”中输入包名，安装后重启 DSH。
+安装包名：`dsh-recent-deliverables`。在 DSH 的“设置 → 插件 → 添加插件 → 安装第三方插件”中输入包名，安装后重启 DSH。
 
 本地目录安装方法见 [INSTALL.md](./INSTALL.md)。
 

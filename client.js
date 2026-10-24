@@ -11,7 +11,7 @@
  * `/api/recent-deliverables.file` route, and opens or reveals them natively.
  */
 window.__ModuleLoader__.load({
-  id: '@jiashengfu/dsh-recent-deliverables',
+  id: 'dsh-recent-deliverables',
   factory(require) {
     const React = require('react')
     const h = React.createElement

@@ -22,7 +22,7 @@
  * first response carries the filesystem scan immediately, the fold runs in the
  * background, and the payload flags `presentPending` so the panel re-asks. No
  * Session log is ever written; this module only reads.
- * @module @jiashengfu/dsh-recent-deliverables
+ * @module dsh-recent-deliverables
  */
 import { createReadStream } from 'node:fs'
 import { readdir, realpath, stat } from 'node:fs/promises'

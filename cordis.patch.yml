@@ -9,7 +9,7 @@
 # discoverable without opening the code.
 - insert:
     - id: recent-deliverables
-      name: '@jiashengfu/dsh-recent-deliverables'
+      name: 'dsh-recent-deliverables'
       config:
         maxItems: 40
         declaredSlots: 12

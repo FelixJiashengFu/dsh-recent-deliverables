@@ -229,7 +229,7 @@ function materialize(options = {}) {
   let factoryResult = null
   const loader = {
     load(entry) {
-      assert.equal(entry.id, '@jiashengfu/dsh-recent-deliverables')
+      assert.equal(entry.id, 'dsh-recent-deliverables')
       factoryResult = entry.factory((name) => {
         if (name === 'react') return reactStub
         throw new Error(`unexpected require(${name})`)

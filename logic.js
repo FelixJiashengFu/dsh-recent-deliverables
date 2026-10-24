@@ -4,7 +4,7 @@
  * This module is deliberately dependency-free (Node built-ins only) so the Host
  * half can import it and a plain `node` test harness can exercise it without the
  * DSH runtime. Nothing here touches the filesystem or Cordis.
- * @module @jiashengfu/dsh-recent-deliverables/logic
+ * @module dsh-recent-deliverables/logic
  */
 
 /** Directories that never contain a user-facing deliverable we want to list. */

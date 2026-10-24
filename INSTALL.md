@@ -14,7 +14,7 @@
 
 ```bash
 mkdir -p ~/Plugins
-unzip dsh-recent-deliverables-1.1.0.zip -d ~/Plugins
+unzip dsh-recent-deliverables-1.1.1.zip -d ~/Plugins
 ```
 
 解压后应能看到 `~/Plugins/dsh-recent-deliverables/package.json`。
@@ -47,13 +47,13 @@ dsh plugin --profile desktop add /绝对路径/dsh-recent-deliverables
 ## 3. 验证
 
 - 重启后：页面**右上角**出现「成品」浮窗，可拖动、可折叠成药丸。
-- **设置 → 插件** 里能看到 `@jiashengfu/dsh-recent-deliverables`（版本 1.1.0）。
+- **设置 → 插件** 里能看到 `dsh-recent-deliverables`（版本 1.1.1）。
 - 行尾三个按钮：纸飞机 = 转发到 IM 助理；应用图标 = 用系统应用打开；文件夹 = 在文件管理器中显示。
 - 「转发到 IM 助理」需要**另外安装** `@michengai/dsh-im-connect` 并至少绑定一个聊天；没装它不影响列表、预览、打开、拖动这些功能（转发会提示连不上）。
 
 ## 4. 卸载
 
-设置 → 插件 → 找到 `@jiashengfu/dsh-recent-deliverables` → 卸载，然后可以删除目录。
+设置 → 插件 → 找到 `dsh-recent-deliverables` → 卸载，然后可以删除目录。
 （agent 侧也可以用 `plugin_manager` 的 `remove_bundle`。）
 
 ## 5. 自检（可选，需要 Node 22+）
@@ -83,6 +83,6 @@ Tested on **macOS + DSH Desktop 0.2.1-rc.2**; no npm or native dependencies.
 1. Unzip into a **permanent** directory, e.g. `~/Plugins/dsh-recent-deliverables`.
 2. In DSH: **Settings → Plugins → Add plugin → Install third-party plugin**, enter the **absolute path** of that directory, then **restart DSH**.
    (Or ask the agent: *install the local bundle at `/abs/path/dsh-recent-deliverables` via `plugin_manager install_bundle`*.)
-3. The panel appears in the top-right corner. Settings → Plugins should list `@jiashengfu/dsh-recent-deliverables` 1.1.0.
+3. The panel appears in the top-right corner. Settings → Plugins should list `dsh-recent-deliverables` 1.1.1.
 
 The install links to that directory — **do not move or delete it afterwards**. The "Forward to IM Assistant" action additionally needs `@michengai/dsh-im-connect` with at least one bound chat; everything else works without it.
