@@ -1,0 +1,60 @@
+{
+  "name": "@jiashengfu/dsh-recent-deliverables",
+  "version": "1.1.0",
+  "description": "Claude-style floating panel that lists the files you produced most recently (PDF, HTML, Office, images, ...) and opens, previews, or reveals them.",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "logic.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "INSTALL.md",
+    "LICENSE"
+  ],
+  "icon": "./icon.svg",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": []
+    }
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin",
+    "deliverables",
+    "artifacts"
+  ],
+  "license": "MIT",
+  "author": "Jiasheng Fu",
+  "homepage": "https://github.com/FelixJiashengFu/dsh-recent-deliverables#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FelixJiashengFu/dsh-recent-deliverables.git"
+  },
+  "bugs": {
+    "url": "https://github.com/FelixJiashengFu/dsh-recent-deliverables/issues"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,22 @@
+# Recent Deliverables bundle patch.
+#
+# Inserts the Host row that serves the authenticated /api/recent-deliverables.*
+# routes; the browser half ships through package.json dsh.client and registers
+# the floating "最近成品" panel into the shell overlay.
+#
+# Every key below is optional; the Host normalizes missing or invalid values to
+# the defaults documented in README.md. They are restated here so the recipe is
+# discoverable without opening the code.
+- insert:
+    - id: recent-deliverables
+      name: '@jiashengfu/dsh-recent-deliverables'
+      config:
+        maxItems: 40
+        declaredSlots: 12
+        maxSessions: 16
+        maxSessionAgeDays: 60
+        scanDepth: 5
+        maxScanFiles: 12000
+        cacheMs: 15000
+        includePresent: true
+        includeFiles: true
