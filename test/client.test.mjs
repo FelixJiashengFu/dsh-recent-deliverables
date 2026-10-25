@@ -276,6 +276,10 @@ test('old preferences migrate without losing the filter or drag anchor', () => {
   assert.equal(old.top, 30)
   assert.equal(old.language, 'auto')
   assert.equal(old.showTime, true)
+  assert.equal(old.showClock, false)
+  assert.equal(old.showWeather, false)
+  assert.equal(helpers.normalizeUiState({ showClock: true, showWeather: true, showTime: false }).showClock, true)
+  assert.equal(helpers.normalizeUiState({ showClock: true, showWeather: true, showTime: false }).showWeather, true)
   assert.equal(helpers.normalizeUiState({ showTime: false }).showTime, false)
   assert.deepEqual(old.avatar, { kind: 'default', value: '' })
   assert.equal(helpers.normalizeUiState({ language: 'zh' }).language, 'zh')
@@ -372,6 +376,17 @@ test('rename immediately replaces its item and suppresses an in-flight old path'
   respond(Response.json({ items: [after], stats: { shown: 1 } })); await pending
   assert.equal(store.get().items[0].path, after.path)
   store.dispose()
+})
+
+test('weather symbols distinguish day, night, rain, snow, storms and unknown data', () => {
+  const symbol = new Function(`${extractFunction('weatherSymbol')}\nreturn weatherSymbol`)()
+  assert.equal(symbol(0, true).emoji, '☀️')
+  assert.equal(symbol(0, false).emoji, '🌙')
+  assert.equal(symbol(61, true).key, 'rain')
+  assert.equal(symbol(75, false).key, 'snow')
+  assert.equal(symbol(97, true).key, 'thunder')
+  assert.equal(symbol(null, true).key, 'unknown')
+  assert.equal(symbol(999, true).emoji, '—')
 })
 
 for (const { name, fn } of cases) {

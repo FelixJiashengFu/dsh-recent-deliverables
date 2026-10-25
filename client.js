@@ -24,6 +24,8 @@ window.__ModuleLoader__.load({
     const DELETE_URL = 'api/recent-deliverables.delete'
     const BATCH_DELETE_URL = 'api/recent-deliverables.delete-batch'
     const RENAME_URL = 'api/recent-deliverables.rename'
+    const WEATHER_URL = 'api/recent-deliverables.weather'
+    const WEATHER_MS = 20 * 60 * 1000
     const ROW_BATCH = 100
     /** Browser-local UI state (never synced). */
     const STORAGE_KEY = 'dsh.recent-deliverables.v1'
@@ -92,6 +94,33 @@ window.__ModuleLoader__.load({
 
     const DICTIONARY = {
       en: {
+        'settings.clock': 'Current local time',
+        'settings.clockShow': 'Show clock',
+        'settings.clockHide': 'Hide clock',
+        'settings.clockHint': 'Uses this computer’s timezone. Works offline; independent from file times.',
+        'settings.weather': 'Automatic weather',
+        'settings.weatherShow': 'Show weather',
+        'settings.weatherHide': 'Hide weather',
+        'settings.weatherHint': 'Estimates the DSH computer’s city from its public IP using ipapi.co, then queries Open-Meteo. No precise device location or file data is sent. VPNs and remote hosts may change the city.',
+        'weather.loading': 'Finding nearby weather…',
+        'weather.unavailable': 'Weather is unavailable for now',
+        'weather.stale': 'previous weather · refresh unavailable',
+        'weather.retry': 'Retry weather',
+        'weather.auto': 'Automatic city',
+        'clock.label': 'Current time',
+        'weather.clear': 'Clear',
+        'weather.partly': 'Partly cloudy',
+        'weather.cloudy': 'Overcast',
+        'weather.fog': 'Fog',
+        'weather.drizzle': 'Drizzle',
+        'weather.rain': 'Rain',
+        'weather.freezing': 'Freezing rain',
+        'weather.snow': 'Snow',
+        'weather.showers': 'Showers',
+        'weather.thunder': 'Thunderstorm',
+        'weather.unknown': 'Weather unavailable',
+        'select.allShort': 'All',
+        'select.trashShort': 'Move to trash',
         'select': 'Select files',
         'select.cancel': 'Cancel selection',
         'select.row': 'Select — {name}',
@@ -222,6 +251,33 @@ window.__ModuleLoader__.load({
         'platform.slack': 'Slack',
       },
       zh: {
+        'settings.clock': '当前所在地时间',
+        'settings.clockShow': '显示时钟',
+        'settings.clockHide': '不显示时钟',
+        'settings.clockHint': '跟随这台电脑的时区，离线也可显示，与文件时间分开设置。',
+        'settings.weather': '自动天气',
+        'settings.weatherShow': '显示天气',
+        'settings.weatherHide': '不显示天气',
+        'settings.weatherHint': '通过 ipapi.co 按 DSH 所在电脑的公网 IP 估算城市，再向 Open-Meteo 查询天气；不读取精确定位，不发送文件数据。VPN 或远程宿主可能影响城市。',
+        'weather.loading': '正在识别附近天气…',
+        'weather.unavailable': '天气暂时不可用',
+        'weather.stale': '上次天气，暂时无法更新',
+        'weather.retry': '重试天气',
+        'weather.auto': '自动识别城市',
+        'clock.label': '当前时间',
+        'weather.clear': '晴',
+        'weather.partly': '多云',
+        'weather.cloudy': '阴',
+        'weather.fog': '雾',
+        'weather.drizzle': '毛毛雨',
+        'weather.rain': '雨',
+        'weather.freezing': '冻雨',
+        'weather.snow': '雪',
+        'weather.showers': '阵雨',
+        'weather.thunder': '雷雨',
+        'weather.unknown': '天气未知',
+        'select.allShort': '全选',
+        'select.trashShort': '移到废纸篓',
         'select': '多选',
         'select.cancel': '取消选择',
         'select.row': '选择 — {name}',
@@ -603,6 +659,7 @@ window.__ModuleLoader__.load({
       copy: 'M9 9.5h9.5V19H9zM15 6.5H5.5V16',
       trashCute: 'M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13M10 10v6M14 10v6M10 17q2 2 4 0',
       select: 'M4 5h5v5H4zM15 5h5M15 9h5M4 15h5v5H4zM15 15h5M15 19h5',
+      heart: 'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z',
       stack: 'M4.5 8.5L12 4.6l7.5 3.9L12 12.4zM4.5 12.6L12 16.5l7.5-3.9M4.5 16.4L12 20.3l7.5-3.9',
     }
 
@@ -797,6 +854,8 @@ window.__ModuleLoader__.load({
         right: Number.isFinite(parsed.right) ? parsed.right : null,
         top: Number.isFinite(parsed.top) ? parsed.top : null,
         showTime: parsed.showTime !== false,
+        showClock: parsed.showClock === true,
+        showWeather: parsed.showWeather === true,
         language: parsed.language === 'zh' || parsed.language === 'en' ? parsed.language : 'auto',
         avatar: normalizeAvatar(parsed.avatar),
       }
@@ -846,6 +905,92 @@ window.__ModuleLoader__.load({
         }
         reader.readAsDataURL(file)
       })
+    }
+
+    function weatherSymbol(code, isDay) {
+      if (code === 0) return { emoji: isDay ? '☀️' : '🌙', key: 'clear' }
+      if (code === 1 || code === 2) return { emoji: isDay ? '🌤️' : '☁️', key: 'partly' }
+      if (code === 3) return { emoji: '☁️', key: 'cloudy' }
+      if ([45, 48].includes(code)) return { emoji: '🌫️', key: 'fog' }
+      if ([51, 53, 55].includes(code)) return { emoji: '🌦️', key: 'drizzle' }
+      if ([56, 57, 66, 67].includes(code)) return { emoji: '🌧️', key: 'freezing' }
+      if ([61, 63, 65].includes(code)) return { emoji: '🌧️', key: 'rain' }
+      if ([71, 73, 75, 77, 85, 86].includes(code)) return { emoji: '🌨️', key: 'snow' }
+      if ([80, 81, 82].includes(code)) return { emoji: '🌦️', key: 'showers' }
+      if ([95, 96, 97, 99].includes(code)) return { emoji: '⛈️', key: 'thunder' }
+      return { emoji: '—', key: 'unknown' }
+    }
+
+    function localClock(now, language) {
+      return new Intl.DateTimeFormat(language === 'zh' ? 'zh-CN' : 'en-GB', {
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+      }).format(new Date(now))
+    }
+
+    function createWeatherStore() {
+      let snapshot = { status: 'idle', data: null }, request = null, lastTry = 0
+      const listeners = new Set()
+      const publish = (next) => { snapshot = next; for (const listener of listeners) listener() }
+      return {
+        get: () => snapshot,
+        subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener) },
+        async load(force = false) {
+          if (request) return request
+          if (!force && lastTry && Date.now() - lastTry < (snapshot.status === 'error' || snapshot.data?.stale ? 60000 : WEATHER_MS)) return
+          lastTry = Date.now()
+          publish({ ...snapshot, status: 'loading' })
+          request = (async () => {
+            try {
+              const response = await fetch(WEATHER_URL, { credentials: 'same-origin', cache: 'no-store' })
+              if (!response.ok) throw new Error('weather-unavailable')
+              const data = await response.json()
+              if (typeof data.city !== 'string' || !Number.isInteger(data.code) || !Number.isFinite(data.temperature)) throw new Error('weather-unavailable')
+              publish({ status: 'ready', data })
+            } catch { publish({ status: 'error', data: snapshot.data ? { ...snapshot.data, stale: true } : null }) }
+            finally { request = null }
+          })()
+          return request
+        },
+      }
+    }
+    const weatherStore = createWeatherStore()
+
+    function AmbientStatus({ showClock, showWeather, details = false }) {
+      const [now, setNow] = React.useState(Date.now)
+      const [weather, setWeather] = React.useState(weatherStore.get)
+      React.useEffect(() => weatherStore.subscribe(() => setWeather(weatherStore.get())), [])
+      React.useEffect(() => {
+        if (!showClock) return undefined
+        let timer = null
+        const tick = () => {
+          if (timer !== null) window.clearTimeout(timer)
+          setNow(Date.now())
+          if (document.visibilityState !== 'hidden') timer = window.setTimeout(tick, 60000 - Date.now() % 60000 + 30)
+        }
+        tick()
+        window.addEventListener('focus', tick)
+        document.addEventListener('visibilitychange', tick)
+        return () => { window.clearTimeout(timer); window.removeEventListener('focus', tick); document.removeEventListener('visibilitychange', tick) }
+      }, [showClock])
+      React.useEffect(() => {
+        if (!showWeather) return undefined
+        const refresh = () => { if (document.visibilityState !== 'hidden') void weatherStore.load() }
+        refresh()
+        const timer = window.setInterval(refresh, WEATHER_MS)
+        window.addEventListener('focus', refresh)
+        document.addEventListener('visibilitychange', refresh)
+        return () => { window.clearInterval(timer); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh) }
+      }, [showWeather])
+      const data = weather.data
+      const symbol = data ? weatherSymbol(data.code, data.isDay) : null
+      const label = data ? `${data.city} · ${t('weather.' + symbol.key)} · ${Math.round(data.temperature)}°C${data.stale ? ' · ' + t('weather.stale') : ''}` : t(weather.status === 'error' ? 'weather.unavailable' : 'weather.loading')
+      if (details) return showWeather ? h('div', { className: 'rd-weather-details', role: 'status' },
+        h('span', null, data ? `${t('weather.auto')}: ${label}` : label),
+        weather.status === 'error' || data?.stale ? h('button', { type: 'button', className: 'rd-link', onClick: () => weatherStore.load(true) }, t('weather.retry')) : null) : null
+      if (!showClock && !showWeather) return null
+      return h('span', { className: 'rd-now' },
+        showClock ? h('time', { dateTime: new Date(now).toISOString(), title: `${t('clock.label')} · ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, 'aria-label': `${t('clock.label')} ${localClock(now, activeLanguage)}` }, localClock(now, activeLanguage)) : null,
+        showWeather ? h('span', { className: 'rd-weather-emoji', role: 'img', 'aria-label': label, title: `${label} · Open-Meteo`, 'data-stale': Boolean(data?.stale) }, symbol ? symbol.emoji : '…') : null)
     }
 
     function Character({ avatar, size = 20 }) {
@@ -942,11 +1087,9 @@ window.__ModuleLoader__.load({
 .rd-mini:hover{background:var(--rd-hover);color:var(--rd-ink)}
 .rd-mini:disabled{opacity:.4;cursor:default}
 .rd-mini:focus-visible{outline:2px solid var(--rd-accent);outline-offset:1px}
-.rd-delete{position:relative;flex:none;display:grid;place-items:center;width:27px;height:27px;margin-left:2px;border:1px solid color-mix(in srgb,#dc8e9b 30%,var(--rd-line));border-radius:10px;background:color-mix(in srgb,#dc8e9b 12%,var(--rd-surface));color:var(--rd-accent);cursor:pointer;touch-action:none;user-select:none;transition:transform .18s ease,background .18s ease}
-.rd-delete::after{content:'♡';position:absolute;top:-5px;font-size:8px;line-height:1;color:#d97e91;opacity:.8;transition:opacity .18s ease}
-.rd-delete::after{right:-2px}
-.rd-delete:hover{transform:translateY(-1px);background:color-mix(in srgb,#dc8e9b 24%,var(--rd-surface))}
-.rd-delete:hover::after{opacity:1}
+.rd-delete{box-sizing:border-box;padding:0;line-height:0;position:relative;flex:none;display:grid;place-items:center;width:27px;height:27px;margin-left:2px;border:1px solid color-mix(in srgb,#dc8e9b 30%,var(--rd-line));border-radius:10px;background:color-mix(in srgb,#dc8e9b 12%,var(--rd-surface));color:var(--rd-accent);cursor:pointer;touch-action:none;user-select:none;transition:transform .18s ease,background .18s ease}
+.rd-delete svg{display:block;place-self:center}
+.rd-delete:hover{background:color-mix(in srgb,#dc8e9b 24%,var(--rd-surface))}
 .rd-delete:focus-visible{outline:2px solid var(--rd-accent);outline-offset:2px}
 .rd-delete:disabled{opacity:.45;cursor:wait;transform:none}
 .rd-name-line{display:flex;align-items:center;min-width:0;gap:6px}
@@ -957,15 +1100,37 @@ window.__ModuleLoader__.load({
 .rd-details{display:block;width:100%;min-width:0;background:none;border:0;margin:0;padding:0;color:inherit;text-align:left;cursor:pointer;font:inherit}
 .rd-details:focus-visible,.rd-tile:focus-visible{outline:2px solid var(--rd-accent);outline-offset:2px;border-radius:5px}
 .rd-tile{border:0;padding:0;cursor:pointer}
-.rd-select-toggle{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.rd-selection-slot{position:relative;box-sizing:border-box;height:32px;min-height:32px;flex:none}
+.rd-select-toggle,.rd-select-bar{position:absolute;inset:0;box-sizing:border-box;display:flex;align-items:center;gap:5px;min-width:0}
+.rd-select-toggle{justify-content:space-between}
 .rd-select-hint{font-size:9px;color:var(--rd-ink-3);min-width:0}
-.rd-select-bar{display:flex;align-items:center;gap:6px;padding:7px 12px;background:color-mix(in srgb,var(--rd-accent) 8%,var(--rd-surface));border-top:1px solid var(--rd-line);font-size:10px;flex-wrap:wrap}
-.rd-select-bar strong{flex:1;white-space:nowrap;color:var(--rd-accent)}
-.rd-select-bar .rd-btn{font-size:10px;padding:5px 8px}
+.rd-select-bar{padding:3px 5px;border-radius:8px;background:color-mix(in srgb,var(--rd-accent) 8%,var(--rd-surface));font-size:10px;white-space:nowrap;overflow:hidden}
+.rd-select-bar strong{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--rd-accent);font-weight:600}
+.rd-select-bar .rd-link{font-size:10px;flex:none;padding:3px 5px}
+.rd-select-bar .rd-btn{font-size:10px;padding:4px 7px;white-space:nowrap;flex:none}
 .rd-row[data-selected="true"]{background:color-mix(in srgb,var(--rd-accent) 13%,var(--rd-surface))}
-.rd-list[data-select-mode="true"] .rd-actions{display:none}
-.rd-check{width:13px;height:13px;margin:0;flex:none;accent-color:var(--rd-accent);cursor:pointer}
+.rd-list[data-select-mode="true"] .rd-actions{visibility:hidden;pointer-events:none}
+.rd-list[data-select-mode="true"] .rd-tile{visibility:hidden}
+.rd-check{appearance:none;position:absolute;left:15.5px;top:50%;transform:translateY(-50%);box-sizing:border-box;display:grid;place-items:center;width:22px;height:22px;margin:0;z-index:1;border:1px solid var(--rd-line);border-radius:6px;background:var(--rd-canvas);cursor:pointer}
+.rd-check:checked{border-color:var(--rd-accent);background:var(--rd-accent)}
+.rd-check:checked::after{content:"";display:block;width:5px;height:9px;border:solid #fff9f1;border-width:0 2px 2px 0;transform:rotate(45deg);margin-top:-3px}
+.rd-check:focus-visible{outline:2px solid var(--rd-accent);outline-offset:2px}
 .rd-list[data-sweeping="true"]{user-select:none;touch-action:none}
+.rd-now{display:flex;align-items:center;gap:6px;min-height:15px;font-size:10px;line-height:15px;color:var(--rd-ink-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.rd-now time{color:var(--rd-ink-2)}
+.rd-weather-emoji{font-size:13px;line-height:15px}
+.rd-weather-emoji[data-stale="true"]{opacity:.55}
+.rd-weather-details{font-size:10.5px;line-height:1.6;color:var(--rd-ink-2)}
+.rd-weather-sources{display:flex;align-items:center;gap:8px;font-size:10px}
+.rd-weather-sources a{color:var(--rd-accent);text-decoration:none}
+.rd-weather-sources a:hover{text-decoration:underline}
+.rd-heart-layer{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:110}
+.rd-heart-burst{position:absolute;width:0;height:0;pointer-events:none}
+.rd-heart{position:absolute;left:-7px;top:-8px;width:14px;height:14px;color:#e7a0b7;opacity:0;animation:rd-heart-pop 1.15s cubic-bezier(.2,.65,.3,1) both;animation-delay:var(--rd-heart-delay)}
+.rd-heart svg{display:block;fill:currentColor;stroke:#f5c9d7;filter:drop-shadow(0 1px 2px #50304025)}
+@keyframes rd-heart-pop{0%{opacity:0;transform:translate(0,0) scale(.35)}15%{opacity:.95}75%{opacity:.65}100%{opacity:0;transform:translate(var(--rd-heart-x),var(--rd-heart-y)) scale(.75) rotate(var(--rd-heart-rotate))}}
+@keyframes rd-heart-fade{0%,100%{opacity:0}35%,65%{opacity:.85}}
+@media(prefers-reduced-motion:reduce){.rd-heart{animation:rd-heart-fade .3s linear both;animation-delay:0s}}
 .rd-more{display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px;color:var(--rd-ink-3);font-size:10px}
 @media (prefers-reduced-motion:reduce){.rd-delete:hover{transform:none}}
 .rd-empty{padding:26px 22px 30px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px}
@@ -1061,6 +1226,8 @@ window.__ModuleLoader__.load({
       const listRef = React.useRef(null)
       const [renaming, setRenaming] = React.useState(null)
       const renameRef = React.useRef(null)
+      const [heartBursts, setHeartBursts] = React.useState([])
+      const heartTimers = React.useRef(new Set())
       const [rowLimit, setRowLimit] = React.useState(ROW_BATCH)
       const [forward, setForward] = React.useState(null)
       const [removing, setRemoving] = React.useState(null)
@@ -1198,6 +1365,7 @@ window.__ModuleLoader__.load({
           if (toastTimer.current !== null) window.clearTimeout(toastTimer.current)
           if (removeTimer.current !== null) window.clearTimeout(removeTimer.current)
           sweepRef.current?.cleanup()
+          for (const timer of heartTimers.current) window.clearTimeout(timer)
         },
         [],
       )
@@ -1537,6 +1705,17 @@ window.__ModuleLoader__.load({
         }
       }
 
+      const bubbleHearts = (button) => {
+        const root = rootRef.current
+        if (!root || !button) return
+        const r = root.getBoundingClientRect(), b = button.getBoundingClientRect()
+        const scaleX = r.width / root.offsetWidth || 1, scaleY = r.height / root.offsetHeight || 1
+        const burst = { id: `${Date.now()}-${Math.random()}`, x: (b.x + b.width / 2 - r.x) / scaleX, y: (b.y + b.height / 2 - r.y) / scaleY }
+        setHeartBursts((current) => [...current.slice(-5), burst])
+        const timer = window.setTimeout(() => { setHeartBursts((current) => current.filter((item) => item.id !== burst.id)); heartTimers.current.delete(timer) }, 1600)
+        heartTimers.current.add(timer)
+      }
+
       const startSweep = (event, item, index) => {
         if (event.button !== 0 || batchBusy || renaming?.busy) return
         sweepClick.current = false
@@ -1861,6 +2040,7 @@ window.__ModuleLoader__.load({
                 h('span', { className: 'rd-count' }, String(counts.all)),
               ),
               h('span', { className: 'rd-sub' }, t(stats?.presentPending ? 'scan.pending' : 'subtitle')),
+              h(AmbientStatus, { showClock: ui.showClock, showWeather: ui.showWeather }),
             ),
             h(
               'span',
@@ -1931,18 +2111,20 @@ window.__ModuleLoader__.load({
                   ),
                 ),
               ),
-              h('div', { className: 'rd-select-toggle' },
-                h('span', { className: 'rd-select-hint' }, t('select.hint')),
-                h('button', { type: 'button', className: 'rd-link', disabled: batchBusy,
-                  'aria-pressed': selectionMode, onClick: () => selectionMode ? cancelSelection() : setSelectionMode(true) }, t('select'))),
+              h('div', { className: 'rd-selection-slot' },
+                selectionMode ? h('div', { className: 'rd-select-bar', role: 'group', 'aria-label': t('select') },
+                  h('strong', { role: 'status' }, t('select.count', { n: items.filter((item) => selected.has(item.path)).length })),
+                  h('button', { type: 'button', className: 'rd-link', disabled: batchBusy, title: t('select.all'), 'aria-label': t('select.all'),
+                    onClick: () => setSelected(new Set(visible.map((item) => item.path))) }, t('select.allShort')),
+                  h('button', { type: 'button', className: 'rd-icon', disabled: batchBusy, title: t('select.cancel'), 'aria-label': t('select.cancel'), onClick: cancelSelection }, h(Icon, { name: 'close', size: 13 })),
+                  h('button', { type: 'button', className: 'rd-btn', disabled: batchBusy || !items.some((item) => selected.has(item.path)),
+                    title: t('select.delete', { n: selected.size }), 'aria-label': t('select.delete', { n: items.filter((item) => selected.has(item.path)).length }),
+                    onClick: (event) => { bubbleHearts(event.currentTarget); void deleteSelected() } }, batchBusy ? h('span', { className: 'rd-spinner', 'aria-hidden': 'true' }) : t('select.trashShort'))) :
+                h('div', { className: 'rd-select-toggle' },
+                  h('span', { className: 'rd-select-hint' }, t('select.hint')),
+                  h('button', { type: 'button', className: 'rd-link', disabled: batchBusy, 'aria-pressed': false,
+                    onClick: () => setSelectionMode(true) }, t('select')))),
             ),
-            selectionMode ? h('div', { className: 'rd-select-bar', role: 'group', 'aria-label': t('select') },
-              h('strong', { role: 'status' }, t('select.count', { n: items.filter((item) => selected.has(item.path)).length })),
-              h('button', { type: 'button', className: 'rd-link', disabled: batchBusy,
-                onClick: () => setSelected(new Set(visible.map((item) => item.path))) }, t('select.all')),
-              h('button', { type: 'button', className: 'rd-link', disabled: batchBusy, onClick: cancelSelection }, t('select.cancel')),
-              h('button', { type: 'button', className: 'rd-btn', disabled: batchBusy || !items.some((item) => selected.has(item.path)),
-                onClick: deleteSelected }, batchBusy ? t('delete.busy') : t('select.delete', { n: items.filter((item) => selected.has(item.path)).length }))) : null,
             (snapshot.status === 'loading' || snapshot.status === 'idle') && items.length === 0
               ? h(
                   'div',
@@ -2019,6 +2201,8 @@ window.__ModuleLoader__.load({
         ),
         toast !== null ? h('div', { className: 'rd-toast', role: 'status', key: 'toast' }, toast) : null,
         preview !== null ? renderPreview(preview) : null,
+        h('div', { className: 'rd-heart-layer', 'aria-hidden': 'true' }, heartBursts.map((burst) => h('span', { key: burst.id, className: 'rd-heart-burst', style: { left: burst.x, top: burst.y } },
+          [-26, -16, -7, 8, 18, 28, 2].map((x, index) => h('span', { key: index, className: 'rd-heart', style: { '--rd-heart-x': `${x}px`, '--rd-heart-y': `${-45 - (index % 3) * 15}px`, '--rd-heart-delay': `${index * 25}ms`, '--rd-heart-rotate': `${x / 2}deg` } }, h(Icon, { name: 'heart', size: 14 })))))) ,
       )
 
       function renderSettings() {
@@ -2039,6 +2223,22 @@ window.__ModuleLoader__.load({
                 className: 'rd-settings-choice', 'aria-pressed': ui.showTime === value,
                 onClick: () => updatePreference({ showTime: value }) }, t(value ? 'settings.timeShow' : 'settings.timeHide')))),
             h('p', { className: 'rd-settings-hint' }, t('settings.timeHint'))),
+          h('div', { className: 'rd-settings-group' },
+            h('span', { className: 'rd-settings-label' }, t('settings.clock')),
+            h('div', { className: 'rd-settings-languages', role: 'group', 'aria-label': t('settings.clock') },
+              [true, false].map((value) => h('button', { type: 'button', key: String(value), className: 'rd-settings-choice',
+                'aria-pressed': ui.showClock === value, onClick: () => updatePreference({ showClock: value }) }, t(value ? 'settings.clockShow' : 'settings.clockHide')))),
+            h('p', { className: 'rd-settings-hint' }, t('settings.clockHint'))),
+          h('div', { className: 'rd-settings-group' },
+            h('span', { className: 'rd-settings-label' }, t('settings.weather')),
+            h('div', { className: 'rd-settings-languages', role: 'group', 'aria-label': t('settings.weather') },
+              [true, false].map((value) => h('button', { type: 'button', key: String(value), className: 'rd-settings-choice',
+                'aria-pressed': ui.showWeather === value, onClick: () => updatePreference({ showWeather: value }) }, t(value ? 'settings.weatherShow' : 'settings.weatherHide')))),
+            h('p', { className: 'rd-settings-hint' }, t('settings.weatherHint')),
+            h(AmbientStatus, { showClock: false, showWeather: ui.showWeather, details: true }),
+            h('div', { className: 'rd-weather-sources' },
+              h('a', { href: 'https://open-meteo.com/', target: '_blank', rel: 'noopener noreferrer' }, 'Weather: Open-Meteo'),
+              h('a', { href: 'https://ipapi.co/', target: '_blank', rel: 'noopener noreferrer' }, 'Location: ipapi.co'))),
           h('div', { className: 'rd-settings-group' },
             h('span', { className: 'rd-settings-label' }, t('settings.character')),
             h('p', { className: 'rd-settings-hint' }, t('settings.characterHint')),
@@ -2152,6 +2352,7 @@ window.__ModuleLoader__.load({
             onPointerDown: (event) => startSweep(event, item, index),
             onClick: (event) => { event.stopPropagation();
               if (event.detail > 0 && sweepClick.current) { sweepClick.current = false; return }
+              bubbleHearts(event.currentTarget)
               if (selectionMode) toggleSelection(item.path)
               else void deleteItem(item) },
           }, deleting === item.path ? h('span', { className: 'rd-spinner sm', 'aria-hidden': 'true' }) :

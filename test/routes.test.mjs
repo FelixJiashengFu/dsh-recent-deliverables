@@ -438,3 +438,25 @@ test('repeated renames can return to the original name without alias cycles', as
     assert.equal(list.items[0].name, name)
   }
 })
+
+
+test('weather endpoint stays idle until requested and returns sanitized optional weather', async (t) => {
+  let calls = 0
+  const f = await fixture(t, {}, {}, undefined, { fetchWeather: async (url) => {
+    calls++
+    return Response.json(String(url).startsWith('https://ipapi.co/') ?
+      { city: 'Demo', country_name: 'Canada', latitude: 43.65, longitude: -79.38, ip: 'private' } :
+      { current: { weather_code: 3, is_day: 1, temperature_2m: 15, time: Math.floor(Date.now() / 1000) } })
+  } })
+  await f.call('list')
+  assert.equal(calls, 0)
+  const response = await f.call('weather')
+  assert.equal(response.status, 200)
+  const data = await response.json()
+  assert.equal(data.code, 3)
+  assert.equal(data.city, 'Demo')
+  assert.equal('ip' in data, false)
+  assert.equal('latitude' in data, false)
+  await f.call('weather')
+  assert.equal(calls, 2)
+})

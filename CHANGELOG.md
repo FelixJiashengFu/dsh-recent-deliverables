@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.0 — 2026-10-25
+
+- Keep batch actions inside the original fixed-height hint area. Overlay checkboxes on file tiles and preserve action spacing so list position, row heights and filename widths remain stable while selecting.
+- Center the trash icon with explicit zero padding. Remove the persistent heart; clicking releases seven rounded heart bubbles in a separate overlay that survives row removal. Honor reduced motion and bound animation nodes and cleanup timers.
+- Add independent, locally persisted switches for current local time and automatic weather, separate from file timestamps. The local clock follows the browser computer timezone, ticks independently each minute and works offline.
+- Add optional host-IP city estimation via ipapi.co and current Open-Meteo weather, with coarse coordinates, no file data, shared requests, 20-minute caching, failure backoff and labeled stale data. Display city and attribution in settings. Clock/weather default off and pause their polling when collapsed.
+- Map day/night, clouds, rain, snow, fog and thunderstorm codes to emoji; keep unknown/failed weather distinct from clear weather.
+- Update feature images, add an actual heart-animation GIF, and document automatic-location accuracy, data flow and provider terms.
+
 ## 1.4.0 — 2026-10-25
 
 - Replace the basket with a centered, symmetric little trash bin and keep only one heart at the upper right.

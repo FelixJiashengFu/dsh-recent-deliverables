@@ -1,7 +1,7 @@
 /**
  * Recent Deliverables — Host half.
  *
- * Owns six authenticated Fetch routes inside Connection's authentication
+ * Owns seven authenticated Fetch routes inside Connection's authentication
  * fence:
  *
  *   GET  /api/recent-deliverables.list   the merged, newest-first deliverable list
@@ -10,6 +10,7 @@
  *   POST /api/recent-deliverables.delete move one unchanged displayed file to OS trash
  *   POST /api/recent-deliverables.delete-batch move a validated selection to OS trash
  *   POST /api/recent-deliverables.rename rename without replacing an existing entry
+ *   GET  /api/recent-deliverables.weather optional, cached approximate-city weather
  *
  * The list has two sources:
  *
@@ -31,6 +32,7 @@ import { createReadStream } from 'node:fs'
 import { readdir, realpath, stat, lstat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import trash from 'trash'
+import { createWeatherService } from './weather.js'
 import { join, dirname } from 'node:path'
 import { homedir } from 'node:os'
 import { validFileName, entryKey, prepareRename, loadAliases, saveAliases, followAlias } from './file-operations.js'
@@ -119,6 +121,8 @@ function mount(ctx, config, trashFile, operations) {
     pendingNames: new Set(),
   }
 
+  const weather = createWeatherService({ fetch: operations.fetchWeather, signal: lifetime.signal })
+
   state.aliasesReady = loadAliases(state.aliasFile).then((aliases) => { state.aliases = aliases })
     .catch((error) => { state.aliasError = error.message })
 
@@ -174,7 +178,14 @@ function mount(ctx, config, trashFile, operations) {
     path: RENAME_PATH, methods: ['POST'], requestBody: 'buffered',
     fetch: serve((request) => renameResponse(state, request)),
   })
-
+  ctx.connection.fetch.register({
+    path: '/api/recent-deliverables.weather', methods: ['GET'], requestBody: 'buffered',
+    fetch: serve(async (request) => {
+      if (request.method !== 'GET') return json({ error: 'method-not-allowed' }, 405)
+      try { return json(await weather.get()) }
+      catch { return json({ error: 'weather-unavailable' }, 503) }
+    }),
+  })
 
 }
 

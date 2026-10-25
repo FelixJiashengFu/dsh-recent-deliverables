@@ -2,28 +2,48 @@
 
 **做出来的文件，都在手边。** 一个给 DeepSeek Harness 用的成品浮窗，集中查看 PDF、网页、Office、图片和文本，直接预览、改名、整理，或用系统应用打开。
 
-![Recent Deliverables 1.4.0：完整计数、拖选整理、直接改名、时间开关和卡通胶囊](https://raw.githubusercontent.com/FelixJiashengFu/dsh-recent-deliverables/main/docs/images/hero.png)
+![Recent Deliverables 1.5.0：完整计数、拖选整理、直接改名、时间开关和卡通胶囊](https://raw.githubusercontent.com/FelixJiashengFu/dsh-recent-deliverables/main/docs/images/hero.png)
 
 [下载最新版](https://github.com/FelixJiashengFu/dsh-recent-deliverables/releases/latest) · [安装说明](./INSTALL.md) · [更新记录](./CHANGELOG.md) · [English](#english)
 
-## 1.4.0：把文件整理得更顺手
+## 1.5.0：选择不跳动，时间与天气随手看
 
 | 操作 | 结果 |
 | --- | --- |
 | 点一下小垃圾桶 | 把这一份文件移到系统废纸篓 / 回收站 |
 | 按住垃圾桶向下拖 | 连续选中多份文件，松手后统一移到废纸篓；边缘自动滚动 |
-| 点「多选」 | 用复选框选择文件，也可全选当前筛选结果，支持键盘操作 |
+| 点「多选」 | 在原有提示区切换操作按钮，列表不被往下挤；复选框占用原文件图标位置，行高和文字宽度保持不变 |
 | 轻触 / 悬停文件名，再点一下 | 文件名以半透明提示可编辑，直接输入新名字；Enter 保存、Esc 取消，失焦也会保存 |
 | 点左上角卡通图标 | 切换中文 / English、显示 / 隐藏时间，或选择自己的卡通形象 |
 | 点击浮窗外 | 自动收成小胶囊，原来的按钮或输入仍正常响应 |
 
-垃圾桶图案居中、左右对称，**只在右上角保留一颗爱心**。文件类型筛选条支持左右滚动，隐藏了会盖住按钮的滚动条。总数显示扫描范围内已收集到的真实文件数量，默认没有 40 或 200 条上限；后台收集交付记录时会显示整理提示。
+垃圾桶图案居中、左右对称，平时不挂爱心；**点击后冒出 7 颗圆润的小爱心泡泡**，向上飘散并消失，文件行移走后动画也能继续。系统开启「减少动态效果」时改为短暂淡入淡出。文件类型筛选条支持左右滚动，隐藏了会盖住按钮的滚动条。总数显示扫描范围内已收集到的真实文件数量，默认没有 40 或 200 条上限；后台收集交付记录时会显示整理提示。
 
-![按住垃圾桶拖选，再统一移到废纸篓](https://raw.githubusercontent.com/FelixJiashengFu/dsh-recent-deliverables/main/docs/images/organize.png)
+![按住垃圾桶拖选，列表保持原位，再统一移到废纸篓](https://raw.githubusercontent.com/FelixJiashengFu/dsh-recent-deliverables/main/docs/images/organize.png)
 
 批量整理会显示选中数量；可取消选择，也可用「全选当前结果」处理搜索 / 筛选后的全部结果，包含还没渲染出来的行。移到废纸篓后计数立即更新；若一部分文件已改变或无法移动，会保留失败的选择并提示结果。只移动你选中的文件，不删除目录，不永久擦除；符号链接只移动链接本身，保留指向的文件。
 
 重命名会改动磁盘上的真实文件名，保留文件内容。遇到同名目标会提示，**不会覆盖已有文件**；拒绝路径分隔符和 Windows 保留名。重命名后的交付文件会继续对应到原交付记录，本机重命名映射保存在 DSH 数据目录的 `recent-deliverables/renames.json`，不修改会话日志。文件扩展名建议保留，以便系统继续识别文件类型。
+
+## 当前所在地时间与自动天气
+
+展开浮窗后，标题下方可以显示小巧的 **`19:07 ☀️`**。点击左上角头像 → **外观与语言**，三个开关分别控制：
+
+| 开关 | 作用 |
+| --- | --- |
+| 文件时间 | 日期分组、文件修改时间和列表更新时间 |
+| 当前所在地时间 | 当前电脑的时区时钟，每分钟独立更新，离线可用 |
+| 自动天气 | 估算当前城市，按天气显示 ☀️、🌙、☁️、🌧️、🌨️、⛈️ 等图标 |
+
+当前时钟与天气默认关闭，不改变已有的文件时间偏好。时钟更新独立于文件行，不会每分钟重新渲染整份文件列表；收成胶囊时停止时钟和天气的刷新计时。设置保存在本机。
+
+天气开关打开后，通过 **[ipapi.co](https://ipapi.co/api/)** 按运行 DSH 的电脑公网 IP 估算城市，再把取整到 0.1 度的近似坐标发给 **[Open-Meteo](https://open-meteo.com/en/docs)** 获取天气。返回前端的数据不含 IP、邮编或坐标；不读取设备精确定位，也不发送文件名、文件内容或会话。设置里显示识别出的城市，图标悬停可看天气和温度。VPN、代理或远程 DSH 宿主可能改变识别城市；时钟始终跟随浏览器所在电脑的时区。
+
+天气约每 20 分钟更新一次，并合并并发请求、缓存结果；关闭时不请求第三方服务。网络失败时保留时钟，提示天气暂不可用；已有旧天气会明确标注，支持重试。天气数据来自 Open-Meteo（[CC BY 4.0 与服务条款](https://open-meteo.com/en/terms)），自动 IP 城市来自 ipapi.co；公共免费端点适用于各服务允许的用途，Open-Meteo 免费 API 限非商业用途，商业集成需按其条款配置服务。
+
+### 点击后的爱心泡泡
+
+![实际点击后的爱心泡泡与固定位置选择栏演示，示例文件](https://raw.githubusercontent.com/FelixJiashengFu/dsh-recent-deliverables/main/docs/images/heart-bubbles.gif)
 
 ## 你的形象、语言与时间
 
@@ -49,7 +69,7 @@
 
 支持 **Windows 与 macOS** 的 DSH Web 插件系统；Windows 使用系统回收站，macOS 使用系统废纸篓。自动化测试覆盖 Windows、macOS、Linux；真实 DSH / 浏览器交互在 Mac 上验证，Windows 桌面界面仍需实机验证。
 
-从 [GitHub Releases](https://github.com/FelixJiashengFu/dsh-recent-deliverables/releases/latest) 下载 `dsh-recent-deliverables-1.4.0.tgz`，通过 DSH CLI 安装，或解压成固定本地目录后在图形界面添加。两种方法见 [INSTALL.md](./INSTALL.md)。若 npm 尚未同步最新版，请优先使用 Releases 包；包名为 `dsh-recent-deliverables`。
+从 [GitHub Releases](https://github.com/FelixJiashengFu/dsh-recent-deliverables/releases/latest) 下载 `dsh-recent-deliverables-1.5.0.tgz`，通过 DSH CLI 安装，或解压成固定本地目录后在图形界面添加。两种方法见 [INSTALL.md](./INSTALL.md)。若 npm 尚未同步最新版，请优先使用 Releases 包；包名为 `dsh-recent-deliverables`。
 
 升级后请**完全退出并重新打开 DSH**，让宿主路由与前端同时更新。
 
@@ -84,7 +104,7 @@
 
 ## HTTP 接口与文件边界
 
-六个路由均注册在宿主 Connection 的鉴权围栏内：
+七个路由均注册在宿主 Connection 的鉴权围栏内：
 
 | 路由 | 用途 |
 | --- | --- |
@@ -94,6 +114,7 @@
 | `POST /api/recent-deliverables.delete` | JSON `{path, token}`，移动一份未变化的文件 |
 | `POST /api/recent-deliverables.delete-batch` | JSON `{files: [{path, token}]}`，每个请求最多 200 项，逐项返回结果；客户端自动分批 |
 | `POST /api/recent-deliverables.rename` | JSON `{path, token, name}`，同目录中重命名，不覆盖目标 |
+| `GET /api/recent-deliverables.weather` | 可选天气，缓存近似城市与当前天气；只在启用天气时调用 |
 
 读取和打开前解析真实路径、检查目录边界；`..` 和符号链接不能绕过工作区限制。显式交付并列出的工作区外文件仍可使用。删除和改名核对列表令牌与文件身份，拒绝已更换的文件或链接；并发重复操作不会重复移动。HTML / SVG 预览处于沙盒中，不得访问宿主页面。
 
@@ -155,7 +176,7 @@ npm pack --dry-run
 
 **Recent Deliverables** keeps files produced in DeepSeek Harness within reach. Preview PDF, HTML, images and text; open Office files in their native apps; search or filter the full collected list.
 
-Version 1.4 adds a symmetric little trash bin with one heart, drag-to-select batch cleanup, direct inline renaming with collision protection, a persistent show/hide-times setting, and a filter strip without an overlapping scrollbar. Chinese/English, local cartoon avatars and outside-click collapse are included.
+Version 1.5 keeps selection controls in a fixed space, so entering batch selection preserves list position, row height and text width. The centered trash bin releases heart bubbles only after a click. Independent local-clock and automatic-weather switches join file-time preferences. Direct inline renaming, collision protection and the clean filter strip remain available. Chinese/English, local cartoon avatars and outside-click collapse are included. The clock follows the browser computer’s timezone and works offline. Optional weather uses approximate host-IP location from ipapi.co and Open-Meteo data; it may reflect a VPN or remote host city, and sends no file data. Weather requests are cached for 20 minutes. Open-Meteo’s free API is for non-commercial use; see its terms above.
 
 The first 100 file rows render initially, with more appended on scroll; the total remains complete. Content loads when a preview opens, and the collapsed capsule refreshes less often. Moving files to OS trash is recoverable; disk space is reclaimed when the OS trash is emptied. No measured RAM-saving percentage is claimed.
 
