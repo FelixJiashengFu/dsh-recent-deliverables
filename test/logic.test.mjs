@@ -109,12 +109,12 @@ test('mediaOfPath inline previews only for browser-renderable kinds', () => {
 
 test('normalizeConfig fills defaults and clamps out-of-range values', () => {
   const defaults = normalizeConfig(undefined)
-  assert.equal(defaults.maxItems, 40)
+  assert.equal(defaults.maxItems, 0)
   assert.equal(defaults.declaredSlots, 12)
-  assert.equal(defaults.maxSessions, 16)
-  assert.equal(defaults.maxSessionAgeDays, 60)
+  assert.equal(defaults.maxSessions, 0)
+  assert.equal(defaults.maxSessionAgeDays, 0)
   assert.equal(defaults.scanDepth, 5)
-  assert.equal(defaults.maxScanFiles, 12000)
+  assert.equal(defaults.maxScanFiles, 0)
   assert.equal(defaults.cacheMs, 15000)
   assert.equal(defaults.includePresent, true)
   assert.equal(defaults.includeFiles, true)
@@ -122,9 +122,9 @@ test('normalizeConfig fills defaults and clamps out-of-range values', () => {
   assert.equal(defaults.extensions, DEFAULT_EXTENSIONS)
 
   const clamped = normalizeConfig({ maxItems: 9999, scanDepth: -3, maxSessions: 'many', includeFiles: false })
-  assert.equal(clamped.maxItems, 40)
+  assert.equal(clamped.maxItems, 9999)
   assert.equal(clamped.scanDepth, 5)
-  assert.equal(clamped.maxSessions, 16)
+  assert.equal(clamped.maxSessions, 0)
   assert.equal(clamped.includeFiles, false)
 
   const custom = normalizeConfig({ extensions: ['.PDF', 'epub'], declaredSlots: 0, extraRoots: ['/a'] })
@@ -220,6 +220,18 @@ test('spare list capacity is filled by remaining declarations in time order', ()
   assert.equal(result.counts.declaredShown, 5)
   assert.equal(result.items[0].path, '/w/new.png')
   assert.equal(result.counts.truncated, true)
+})
+
+test('unlimited lists include every file beyond the old 40 and 200 limits', () => {
+  const files = Array.from({ length: 1234 }, (_, i) => ({ path: `/w/file-${i}.txt`, origin: 'file', mtime: i }))
+  for (const limit of [0, undefined]) {
+    const result = mergeDeliverables([], files, limit, 12)
+    assert.equal(result.items.length, 1234)
+    assert.equal(result.counts.merged, 1234)
+    assert.equal(result.counts.truncated, false)
+  }
+  assert.equal(normalizeConfig({ maxItems: 0, maxScanFiles: 0 }).maxItems, 0)
+  assert.equal(normalizeConfig({ maxScanFiles: 0 }).maxScanFiles, 0)
 })
 
 test('publicItem normalizes and drops empty optional fields', () => {

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.0 — 2026-10-25
+
+- Remove default file-count, scan-entry, session-count and session-age caps. Show the full current count; append long lists as users scroll, with no fixed display ceiling.
+- Add a permanently visible, symmetric smiling basket to every file row. One click moves the selected unchanged file to OS trash and updates the count immediately.
+- Authorize deletion with a per-file list ticket and filesystem identity; reject stale replacements, unlisted paths, directories, malformed requests and duplicate deletions. Trash links without deleting their targets, and never fall back to permanent removal.
+- Invalidate list/scan caches after deletion, retry scans crossing a deletion, and keep stale client responses from restoring deleted rows. Restored files can reappear.
+- Add unlimited-count, old-session, recoverable-delete, concurrency and stale-response regressions. Verify native macOS trash/restore with a temporary file.
+
 ## 1.2.0 — 2026-10-25
 
 - Automatically collapse the expanded panel when clicking outside, including outside iframes, without swallowing the underlying action. Keep owned previews and settings interactive.

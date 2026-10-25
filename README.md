@@ -43,9 +43,16 @@ IM 助理（`@michengai/dsh-im-connect`）在 1.0.12 里撤掉了主动投递的
 列表合并两个来源，按绝对路径去重，按修改时间从新到旧排列：
 
 1. **声明过的成品**：读取 Session 日志里 `deliverables/presented` 事件（就是内置 `present` 工具写下的那条），带说明文案和来源会话标题。为了不阻塞首次打开，这部分在后台折叠；首屏先给文件扫描结果，折好后前端会自动补上。
-2. **最近产出的文件**：对已知工作目录做有界、只读的广度优先扫描——已注册的 workspace、默认目录、最近 Session 的 cwd、以及 `extraRoots`。会跳过 `node_modules`、`.git`、`dist`、`build` 等依赖/构建目录，以及 `.DS_Store`、`._*` 这类系统垃圾文件。
+2. **最近产出的文件**：对已知工作目录按配置深度做只读的广度优先扫描——已注册的 workspace、默认目录、全部可见 Session 的 cwd、以及 `extraRoots`。会跳过 `node_modules`、`.git`、`dist`、`build` 等依赖/构建目录，以及 `.DS_Store`、`._*` 这类系统垃圾文件。
 
 为了不被「一次性生成的一堆中间图」挤出面板，**声明过的成品保留固定席位**（默认 12 个），其余名额由所有剩余条目按时间填满（包括更多已声明成品），最后再按时间排序；保留席位不是交付文件的显示上限。
+
+## 完整计数与一键删除（1.3.0）
+
+- 默认不限制文件条数、扫描条目数量、会话数量或会话年龄。数字显示扫描范围内已收集到的实际文件总数，包含超过 40 或 200 条的结果；后台仍在收集时会显示整理提示。
+- 长列表先渲染 100 行，滚动到底部自动追加；也可以使用「继续显示」，直到全部文件都能查看。这是滚动加载，不会截断总量。
+- 每行右侧常驻一个左右对称的可爱收纳篮。点击一次，将该文件移到系统废纸篓，行和计数立即更新；从系统废纸篓恢复后，刷新会重新显示。
+- 删除只接受当前列表内的文件。若文件已改变，先刷新；不会删除目录，也不会永久擦除。删除符号链接只移走链接，保留指向的原文件。
 
 ## 自动收起、语言和卡通形象（1.2.0）
 
@@ -60,12 +67,12 @@ IM 助理（`@michengai/dsh-im-connect`）在 1.0.12 里撤掉了主动投递的
 
 | 键 | 默认 | 说明 |
 | --- | --- | --- |
-| `maxItems` | `40` | 面板最多显示多少条（1–200） |
+| `maxItems` | `0` | 0 表示不限条数；正数可主动限制显示总量 |
 | `declaredSlots` | `12` | 给「交付」文件保留的席位（0–200） |
-| `maxSessions` | `16` | 折叠多少个最近 Session 的日志找交付记录（0 表示只看文件扫描） |
-| `maxSessionAgeDays` | `60` | 只看最近多少天内活跃过的 Session（0 表示不限制） |
+| `maxSessions` | `0` | 0 表示所有可见会话；正数限制最近会话数量。关闭交付来源请用 `includePresent: false` |
+| `maxSessionAgeDays` | `0` | 只看最近多少天内活跃过的 Session（0 表示不限制） |
 | `scanDepth` | `5` | 目录扫描深度（0–20） |
-| `maxScanFiles` | `12000` | 扫描访问的文件/目录条目上限 |
+| `maxScanFiles` | `0` | 0 表示不限扫描条目；正数可主动限制扫描预算 |
 | `cacheMs` | `15000` | 磁盘扫描结果的缓存时间 |
 | `includePresent` | `true` | 是否包含交付记录 |
 | `includeFiles` | `true` | 是否包含文件扫描 |
@@ -75,17 +82,19 @@ IM 助理（`@michengai/dsh-im-connect`）在 1.0.12 里撤掉了主动投递的
 
 ## HTTP 接口
 
-三个路由都注册在 Connection 的鉴权围栏内（`ctx.connection.fetch.register`），只有本页面的 owner 身份能调用：
+四个路由都注册在 Connection 的鉴权围栏内（`ctx.connection.fetch.register`），只有本页面的 owner 身份能调用：
 
 - `GET /api/recent-deliverables.list` → 合并后的列表、统计、能力位。
 - `GET /api/recent-deliverables.file?path=<绝对路径>` → 列出的文件字节（内嵌预览 / 新标签页）。
 - `POST /api/recent-deliverables.open?path=<绝对路径>[&action=reveal]` → 用桌面默认应用打开 / 在文件管理器中显示。
 
+- `POST /api/recent-deliverables.delete`，JSON `{path, token}` → 将一个列表内且未变化的文件移到系统废纸篓；token 由列表项的 `deleteToken` 提供。
+
 安全约束：
 
 - 读取和打开前先解析真实路径，再检查目录边界。扫描不会将指向工作区外的符号链接加入列表；`..` 和符号链接不能绕过工作区限制。显式通过 `present` 声明并列出的工作区外成品仍可访问；列表记录当时的真实目标，修改符号链接不会自动授权新目标。
 - 生成的 HTML/SVG 以 `Content-Security-Policy: sandbox …` 返回：脚本可以跑（图表能显示），但文档处于不透明源，碰不到 Harness 页面。
-- 本插件从不写 Session 日志，也不写工作区；扫描全程只读。
+- 本插件不写 Session 日志；扫描全程只读。只有点击删除按钮时才移动选定文件，且不提供永久删除的降级行为。
 
 ## 目录
 

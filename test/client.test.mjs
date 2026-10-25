@@ -320,6 +320,30 @@ test('image selection rejects oversized and unsupported files before reading the
   await assert.rejects(image(null), /imageInvalid/)
 })
 
+test('successful deletion updates counts immediately and ignores stale lists while allowing restored files', async () => {
+  let respond
+  const fakeFetch = () => new Promise((resolve) => { respond = resolve })
+  const create = new Function('fetch', 'window', `${extractConst('LIST_URL')}\n${extractFunction('createStore')}\nreturn createStore`)(fakeFetch, { setTimeout, clearTimeout })
+  const store = create()
+  const a = { path: '/a.txt', deleteToken: 'old-ticket' }
+  const b = { path: '/b.txt', deleteToken: 'b-ticket' }
+  let pending = store.load()
+  respond(Response.json({ items: [a, b], stats: { shown: 2 } }))
+  await pending
+  pending = store.load()
+  store.remove(a.path, a.deleteToken)
+  assert.equal(store.get().items.length, 1)
+  assert.equal(store.get().stats.shown, 1)
+  respond(Response.json({ items: [a, b], stats: { shown: 2 } }))
+  await pending
+  assert.deepEqual(store.get().items.map((item) => item.path), [b.path])
+  pending = store.load()
+  respond(Response.json({ items: [{ ...a, deleteToken: 'restored-ticket' }, b], stats: { shown: 2 } }))
+  await pending
+  assert.equal(store.get().items.length, 2)
+  store.dispose()
+})
+
 for (const { name, fn } of cases) {
   try {
     await fn()

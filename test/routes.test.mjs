@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, writeFile, symlink, unlink, realpath, rm } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, symlink, unlink, realpath, rm, rename, access, lstat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { apply } from '../index.js'
+import { apply, createPlugin } from '../index.js'
 
-async function fixture(t, extra = {}) {
+async function fixture(t, extra = {}, config = {}, trashFile) {
   const base = await mkdtemp(join(tmpdir(), 'recent-deliverables-'))
   t.after(() => rm(base, { recursive: true, force: true }))
   const root = join(base, 'workspace')
@@ -22,14 +22,16 @@ async function fixture(t, extra = {}) {
     },
     ...extra,
   }
-  apply({
+  const mount = trashFile ? createPlugin(trashFile) : apply
+  mount({
     effect: (fn) => { const dispose = fn(); t.after(dispose) },
     get: (name) => services[name],
     connection: { fetch: { register: (route) => routes.set(route.path, route.fetch) } },
-  }, { includePresent: Boolean(extra.sessionQuery), cacheMs: 0 })
-  const call = (action, path) => routes.get(`/api/recent-deliverables.${action}`)(
+  }, { includePresent: Boolean(extra.sessionQuery), cacheMs: 0, ...config })
+  const call = (action, path, body) => routes.get(`/api/recent-deliverables.${action}`)(
     new Request(`http://localhost/api/recent-deliverables.${action}?path=${encodeURIComponent(path ?? '')}`,
-      { method: action === 'open' ? 'POST' : 'GET' }),
+      { method: ['open', 'delete'].includes(action) ? 'POST' : 'GET',
+        ...(action === 'delete' ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? { path }) } : {}) }),
   )
   return { base, root, call, opened, services }
 }
@@ -117,4 +119,171 @@ test('explicitly presented outside files retain access, without trusting a retar
   await writeFile(join(base, 'different.txt'), 'different')
   await symlink(join(base, 'different.txt'), declared)
   assert.equal((await call('file', declared)).status, 403)
+})
+
+
+test('default list returns every file above 40 and keeps per-file delete tickets stable', async (t) => {
+  const { root, call } = await fixture(t)
+  for (let i = 0; i < 215; i++) await writeFile(join(root, `file-${i}.txt`), String(i))
+  const first = await (await call('list')).json()
+  const second = await (await call('list')).json()
+  assert.equal(first.items.length, 216)
+  assert.equal(first.stats.shown, 216)
+  assert.equal(first.stats.merged, 216)
+  assert.equal(first.stats.truncated, false)
+  assert.equal(first.stats.scanTruncated, false)
+  assert.equal(second.items[0].deleteToken, first.items[0].deleteToken)
+})
+
+test('deleting a displayed file trashes its exact literal name and updates counts', async (t) => {
+  let moved
+  const f = await fixture(t, {}, {}, async (path, options) => {
+    assert.equal(options.glob, false)
+    moved = join(f.base, 'trashed.txt')
+    await rename(path, moved)
+  })
+  const path = join(f.root, '[star]*.txt')
+  await writeFile(path, 'selected file')
+  const first = await (await f.call('list')).json()
+  const item = first.items.find((item) => item.path === path)
+  const response = await f.call('delete', path, { path, token: item.deleteToken })
+  assert.equal(response.status, 200)
+  assert.equal((await response.json()).recoverable, true)
+  await assert.rejects(access(path))
+  await access(moved)
+  await access(join(f.root, 'inside.txt'))
+  const after = await (await f.call('list')).json()
+  assert.equal(after.items.length, first.items.length - 1)
+  assert.equal(after.stats.shown, first.items.length - 1)
+  assert.equal(after.items.some((item) => item.path === path), false)
+})
+
+test('deletion refuses unlisted paths, directories and forged tokens', async (t) => {
+  let calls = 0
+  const f = await fixture(t, {}, {}, async () => { calls++ })
+  const list = await (await f.call('list')).json()
+  const item = list.items[0]
+  for (const body of [
+    { path: item.path, token: 'forged' },
+    { path: f.root + '/../outside.txt', token: item.deleteToken },
+    { path: f.root, token: item.deleteToken },
+  ]) assert.equal((await f.call('delete', body.path, body)).status, 403)
+  assert.equal(calls, 0)
+  await access(item.path)
+})
+
+test('a changed file or retargeted link cannot be deleted using a stale ticket', async (t) => {
+  let calls = 0
+  const f = await fixture(t, {}, {}, async () => { calls++ })
+  const path = join(f.root, 'inside.txt')
+  let list = await (await f.call('list')).json()
+  const item = list.items.find((item) => item.path === path)
+  await writeFile(path, 'changed since list with a different size')
+  assert.equal((await f.call('delete', path, { path, token: item.deleteToken })).status, 409)
+  const link = join(f.root, 'link.txt')
+  await symlink(path, link)
+  list = await (await f.call('list')).json()
+  const linked = list.items.find((item) => item.path === link)
+  await unlink(link)
+  await symlink(join(f.base, 'outside.txt'), link)
+  assert.equal((await f.call('delete', link, { path: link, token: linked.deleteToken })).status, 409)
+  assert.equal(calls, 0)
+})
+
+test('deleting a link trashes the link and preserves the target', async (t) => {
+  const f = await fixture(t, {}, {}, async (path) => {
+    assert.equal((await lstat(path)).isSymbolicLink(), true)
+    await rename(path, join(f.base, 'trashed-link.txt'))
+  })
+  const target = join(f.root, 'inside.txt')
+  const link = join(f.root, 'link.txt')
+  await symlink(target, link)
+  const list = await (await f.call('list')).json()
+  const item = list.items.find((item) => item.path === link)
+  assert.equal((await f.call('delete', link, { path: link, token: item.deleteToken })).status, 200)
+  await access(target)
+  await assert.rejects(lstat(link))
+})
+
+test('trash failures keep the file and its list entry', async (t) => {
+  const f = await fixture(t, {}, {}, async () => { throw new Error('trash unavailable') })
+  const list = await (await f.call('list')).json()
+  const item = list.items[0]
+  const response = await f.call('delete', item.path, { path: item.path, token: item.deleteToken })
+  assert.equal(response.status, 502)
+  await access(item.path)
+  assert.equal((await (await f.call('list')).json()).items.length, list.items.length)
+})
+
+test('duplicate delete requests trash a file only once', async (t) => {
+  let release, entered, calls = 0
+  const started = new Promise((resolve) => { entered = resolve })
+  const gate = new Promise((resolve) => { release = resolve })
+  const f = await fixture(t, {}, {}, async (path) => {
+    calls++; entered(); await gate; await rename(path, join(f.base, 'trashed.txt'))
+  })
+  const item = (await (await f.call('list')).json()).items[0]
+  const body = { path: item.path, token: item.deleteToken }
+  const first = f.call('delete', item.path, body)
+  await started
+  const second = await f.call('delete', item.path, body)
+  assert.equal(second.status, 409)
+  release()
+  assert.equal((await first).status, 200)
+  assert.equal(calls, 1)
+})
+
+test('lists in flight during deletion retry rather than resurrecting removed entries', async (t) => {
+  const f = await fixture(t, {}, {}, async (path) => rename(path, join(f.base, 'trashed.txt')))
+  const item = (await (await f.call('list')).json()).items[0]
+  let release, entered, calls = 0
+  const started = new Promise((resolve) => { entered = resolve })
+  const gate = new Promise((resolve) => { release = resolve })
+  f.services.sessionController.list = async () => {
+    calls++
+    if (calls === 1) { entered(); await gate }
+    return { items: [] }
+  }
+  const pendingList = f.call('list')
+  await started
+  assert.equal((await f.call('delete', item.path, { path: item.path, token: item.deleteToken })).status, 200)
+  release()
+  assert.equal((await (await pendingList).json()).items.length, 0)
+  assert.ok(calls >= 2)
+})
+
+test('unlimited defaults include old declarations beyond the former 16-session window', async (t) => {
+  const rows = Array.from({ length: 23 }, (_, i) => ({ sessionId: `old-${i}`, updatedAt: Date.now() - 120 * 86400000 }))
+  let base
+  const query = {
+    listEvents: async () => [{ type: 'deliverables/presented', seq: 1 }],
+    readEvent: async ({ sessionId }) => ({ target: { time: 1, data: { files: [{ path: join(base, `${sessionId}.txt`) }] } } }),
+  }
+  const f = await fixture(t, {
+    sessionController: { list: async () => ({ items: rows }) }, sessionQuery: query,
+  }, { includeFiles: false })
+  base = f.base
+  for (const row of rows) await writeFile(join(base, `${row.sessionId}.txt`), row.sessionId)
+  let list
+  for (let i = 0; i < 100; i++) {
+    list = await (await f.call('list')).json()
+    if (!list.stats.presentPending) break
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+  assert.equal(list.items.length, 23)
+  assert.equal(list.stats.presentPending, false)
+  assert.equal(list.stats.declaredShown, 23)
+})
+
+test('delete route requires POST and a small JSON body', async (t) => {
+  const routes = new Map()
+  apply({ effect: (fn) => { t.after(fn()) }, get: () => undefined,
+    connection: { fetch: { register: (route) => routes.set(route.path, route.fetch) } } }, {})
+  const route = routes.get('/api/recent-deliverables.delete')
+  for (const [options, expected] of [
+    [{ method: 'GET' }, 405],
+    [{ method: 'POST', body: '{}' }, 415],
+    [{ method: 'POST', headers: { 'content-type': 'application/json' }, body: '{' }, 400],
+    [{ method: 'POST', headers: { 'content-type': 'application/json' }, body: ' '.repeat(17000) }, 413],
+  ]) assert.equal((await route(new Request('http://localhost/api/recent-deliverables.delete', options))).status, expected)
 })

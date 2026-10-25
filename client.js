@@ -21,6 +21,8 @@ window.__ModuleLoader__.load({
     const LIST_URL = 'api/recent-deliverables.list'
     const FILE_URL = 'api/recent-deliverables.file'
     const OPEN_URL = 'api/recent-deliverables.open'
+    const DELETE_URL = 'api/recent-deliverables.delete'
+    const ROW_BATCH = 100
     /** Browser-local UI state (never synced). */
     const STORAGE_KEY = 'dsh.recent-deliverables.v1'
     const AVATAR_PRESETS = ['🐱', '🐶', '🐰', '🦊', '🐼', '🤖', '🦄', '🐸']
@@ -88,6 +90,15 @@ window.__ModuleLoader__.load({
 
     const DICTIONARY = {
       en: {
+        'delete': 'Move to trash',
+        'delete.busy': 'Moving to trash…',
+        'delete.done': 'Moved to trash 🧺',
+        'delete.failed': 'Could not move to trash: {message}',
+        'delete.changed': 'This file changed. Refresh and try again.',
+        'delete.missing': 'This file is already gone.',
+        'more': 'Show more',
+        'more.count': 'Showing {shown} of {total} files',
+        'scan.pending': 'Collecting all files…',
         'settings.title': 'Appearance & language',
         'settings.open': 'Customize character and language',
         'settings.back': 'Back to files',
@@ -189,6 +200,15 @@ window.__ModuleLoader__.load({
         'platform.slack': 'Slack',
       },
       zh: {
+        'delete': '移到废纸篓',
+        'delete.busy': '正在收进废纸篓…',
+        'delete.done': '已收进废纸篓 🧺',
+        'delete.failed': '移到废纸篓失败：{message}',
+        'delete.changed': '文件已发生变化，请刷新后再试。',
+        'delete.missing': '这个文件已经不在了。',
+        'more': '继续显示',
+        'more.count': '已显示 {shown} / {total} 个文件',
+        'scan.pending': '正在收集全部文件…',
         'settings.title': '外观与语言',
         'settings.open': '自定义卡通形象与语言',
         'settings.back': '返回文件',
@@ -539,6 +559,7 @@ window.__ModuleLoader__.load({
       app: 'M12 3.5v10.5M8.2 7.3L12 3.5l3.8 3.8M5.5 13.5V19a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-5.5',
       folder: 'M3.5 7.2a1.7 1.7 0 0 1 1.7-1.7h3.4l1.9 1.9h7.1a1.7 1.7 0 0 1 1.7 1.7v8.2a1.7 1.7 0 0 1-1.7 1.7H5.2a1.7 1.7 0 0 1-1.7-1.7z',
       copy: 'M9 9.5h9.5V19H9zM15 6.5H5.5V16',
+      basketCute: 'M5 8.5h14l-1.5 11H6.5zM4 8.5h16M8 8.5l2-5M16 8.5l-2-5M9 13v.2M15 13v.2M10 16q2 2 4 0',
       stack: 'M4.5 8.5L12 4.6l7.5 3.9L12 12.4zM4.5 12.6L12 16.5l7.5-3.9M4.5 16.4L12 20.3l7.5-3.9',
     }
 
@@ -579,6 +600,7 @@ window.__ModuleLoader__.load({
         refreshing: false,
       })
       const listeners = new Set()
+      const removedTokens = new Map()
       let request = null
       let followUp = null
       let followUpCount = 0
@@ -634,8 +656,10 @@ window.__ModuleLoader__.load({
             })
             if (!response.ok) throw new Error(`HTTP ${response.status}`)
             const payload = await response.json()
-            const items = Array.isArray(payload?.items) ? payload.items : []
-            const stats = payload?.stats ?? null
+            const incoming = Array.isArray(payload?.items) ? payload.items : []
+            const items = incoming.filter((item) => !removedTokens.has(item.path) ||
+              (typeof item.deleteToken === 'string' && item.deleteToken !== removedTokens.get(item.path)))
+            const stats = payload?.stats ? { ...payload.stats, shown: items.length } : null
             publish({
               status: 'ready',
               items,
@@ -673,6 +697,11 @@ window.__ModuleLoader__.load({
           return () => listeners.delete(listener)
         },
         load: runLoad,
+        remove(path, token) {
+          removedTokens.set(path, token)
+          const items = snapshot.items.filter((item) => item.path !== path)
+          publish({ items, stats: snapshot.stats ? { ...snapshot.stats, shown: items.length } : null })
+        },
         dispose() {
           clearFollowUp()
         },
@@ -850,6 +879,16 @@ window.__ModuleLoader__.load({
 .rd-mini:hover{background:var(--rd-hover);color:var(--rd-ink)}
 .rd-mini:disabled{opacity:.4;cursor:default}
 .rd-mini:focus-visible{outline:2px solid var(--rd-accent);outline-offset:1px}
+.rd-delete{position:relative;flex:none;display:grid;place-items:center;width:27px;height:27px;margin-left:2px;border:1px solid color-mix(in srgb,#dc8e9b 30%,var(--rd-line));border-radius:10px;background:color-mix(in srgb,#dc8e9b 12%,var(--rd-surface));color:var(--rd-accent);cursor:pointer;transition:transform .18s ease,background .18s ease}
+.rd-delete::before,.rd-delete::after{content:'♡';position:absolute;top:-5px;font-size:8px;line-height:1;color:#d97e91;opacity:0;transition:opacity .18s ease}
+.rd-delete::before{left:-2px}
+.rd-delete::after{right:-2px}
+.rd-delete:hover{transform:translateY(-1px);background:color-mix(in srgb,#dc8e9b 24%,var(--rd-surface))}
+.rd-delete:hover::before,.rd-delete:hover::after{opacity:1}
+.rd-delete:focus-visible{outline:2px solid var(--rd-accent);outline-offset:2px}
+.rd-delete:disabled{opacity:.45;cursor:wait;transform:none}
+.rd-more{display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px;color:var(--rd-ink-3);font-size:10px}
+@media (prefers-reduced-motion:reduce){.rd-delete:hover{transform:none}}
 .rd-empty{padding:26px 22px 30px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px}
 .rd-empty-icon{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;color:var(--rd-accent);background:color-mix(in srgb,var(--rd-accent) 11%,transparent);margin-bottom:2px}
 .rd-empty-title{font-family:var(--rd-serif);font-size:13px;color:var(--rd-ink)}
@@ -933,6 +972,9 @@ window.__ModuleLoader__.load({
       const [query, setQuery] = React.useState('')
       const [preview, setPreview] = React.useState(null)
       const [pending, setPending] = React.useState(null)
+      const [deleting, setDeleting] = React.useState(null)
+      const deletingRef = React.useRef(new Set())
+      const [rowLimit, setRowLimit] = React.useState(ROW_BATCH)
       const [forward, setForward] = React.useState(null)
       const [removing, setRemoving] = React.useState(null)
       const forwardToken = React.useRef(0)
@@ -988,6 +1030,8 @@ window.__ModuleLoader__.load({
           document.removeEventListener('visibilitychange', onVisible)
         }
       }, [ui.collapsed])
+
+      React.useEffect(() => setRowLimit(ROW_BATCH), [ui.filter, query])
 
       // Capture observes outside clicks without cancelling the underlying action.
       React.useEffect(() => {
@@ -1286,6 +1330,37 @@ window.__ModuleLoader__.load({
       const openNative = (item) => runPathAction(item, 'open')
       const reveal = (item) => runPathAction(item, 'reveal')
 
+      const deleteItem = async (item) => {
+        if (!item.deleteToken || deletingRef.current.has(item.path)) return
+        deletingRef.current.add(item.path)
+        setDeleting(item.path)
+        try {
+          const response = await fetch(DELETE_URL, {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ path: item.path, token: item.deleteToken }),
+          })
+          const body = await response.json()
+          if (!response.ok || body.deleted !== true) {
+            if (response.status === 409 || response.status === 403) showToast(t('delete.changed'))
+            else if (response.status === 404) showToast(t('delete.missing'))
+            else showToast(t('delete.failed', { message: body.message || body.error || `HTTP ${response.status}` }))
+            void store.load()
+            return
+          }
+          store.remove(item.path, item.deleteToken)
+          if (preview?.path === item.path) setPreview(null)
+          if (forward?.item?.path === item.path) closeForward()
+          showToast(t('delete.done'))
+          void store.load()
+        } catch (error) {
+          showToast(t('delete.failed', { message: error instanceof Error ? error.message : String(error) }))
+        } finally {
+          deletingRef.current.delete(item.path)
+          setDeleting((current) => current === item.path ? null : current)
+        }
+      }
+
       const openNewTab = (item) => {
         const url = `${FILE_URL}?path=${encodeURIComponent(item.path)}`
         const opened = window.open(url, '_blank', 'noopener,noreferrer')
@@ -1488,7 +1563,7 @@ window.__ModuleLoader__.load({
             },
             h('span', { className: 'rd-pill-mark' }, h(Character, { avatar: ui.avatar, size: 13 })),
             h('span', null, t('title')),
-            counts.all > 0 ? h('span', { className: 'rd-pill-n' }, String(counts.all)) : null,
+            h('span', { className: 'rd-pill-n' }, String(counts.all)),
             fresh ? h('span', { className: 'rd-fresh', 'aria-hidden': 'true' }) : null,
           ),
           toast !== null ? h('div', { className: 'rd-toast', role: 'status', key: 'toast' }, toast) : null,
@@ -1498,7 +1573,7 @@ window.__ModuleLoader__.load({
       // ---- expanded panel -------------------------------------------------
       const rows = []
       let lastDay = ''
-      for (const item of visible) {
+      for (const item of visible.slice(0, rowLimit)) {
         const day = dayKeyOf(item.mtime)
         if (day !== lastDay) {
           lastDay = day
@@ -1546,9 +1621,9 @@ window.__ModuleLoader__.load({
                 'span',
                 { className: 'rd-title' },
                 t('title'),
-                counts.all > 0 ? h('span', { className: 'rd-count' }, String(counts.all)) : null,
+                h('span', { className: 'rd-count' }, String(counts.all)),
               ),
-              h('span', { className: 'rd-sub' }, t('subtitle')),
+              h('span', { className: 'rd-sub' }, t(stats?.presentPending ? 'scan.pending' : 'subtitle')),
             ),
             h(
               'span',
@@ -1660,7 +1735,17 @@ window.__ModuleLoader__.load({
                         items.length === 0 ? t('empty.hint') : '',
                       ),
                     )
-                  : h('div', { className: 'rd-list', role: 'list' }, rows),
+                  : h('div', { className: 'rd-list', role: 'list', tabIndex: 0,
+                    onScroll: (event) => {
+                      const node = event.currentTarget
+                      if (node.scrollHeight - node.scrollTop - node.clientHeight < 160) {
+                        setRowLimit((current) => Math.min(visible.length, current + ROW_BATCH))
+                      }
+                    } }, rows,
+                    rowLimit < visible.length ? h('div', { className: 'rd-more' },
+                      h('span', null, t('more.count', { shown: rowLimit, total: visible.length })),
+                      h('button', { className: 'rd-link', type: 'button',
+                        onClick: () => setRowLimit((current) => current + ROW_BATCH) }, t('more'))) : null),
             h(
               'footer',
               { className: 'rd-foot' },
@@ -1814,6 +1899,14 @@ window.__ModuleLoader__.load({
               h(Icon, { name: 'folder', size: 13 }),
             ),
           ),
+          h('button', {
+            type: 'button', className: 'rd-delete',
+            title: `${t(deleting === item.path ? 'delete.busy' : 'delete')} — ${item.name}`,
+            'aria-label': `${t('delete')} — ${item.name}`,
+            disabled: !item.deleteToken || deletingRef.current.has(item.path),
+            onClick: (event) => { event.stopPropagation(); void deleteItem(item) },
+          }, deleting === item.path ? h('span', { className: 'rd-spinner sm', 'aria-hidden': 'true' }) :
+            h(Icon, { name: 'basketCute', size: 17 })),
         )
       }
 

@@ -11,12 +11,12 @@
     - id: recent-deliverables
       name: 'dsh-recent-deliverables'
       config:
-        maxItems: 40
+        maxItems: 0
         declaredSlots: 12
-        maxSessions: 16
-        maxSessionAgeDays: 60
+        maxSessions: 0
+        maxSessionAgeDays: 0
         scanDepth: 5
-        maxScanFiles: 12000
+        maxScanFiles: 0
         cacheMs: 15000
         includePresent: true
         includeFiles: true

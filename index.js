@@ -1,12 +1,13 @@
 /**
  * Recent Deliverables — Host half.
  *
- * Owns three authenticated Fetch routes inside Connection's authentication
+ * Owns four authenticated Fetch routes inside Connection's authentication
  * fence:
  *
  *   GET  /api/recent-deliverables.list   the merged, newest-first deliverable list
  *   GET  /api/recent-deliverables.file   one listed file's bytes (inline preview)
  *   POST /api/recent-deliverables.open   open / reveal one listed path on the desktop
+ *   POST /api/recent-deliverables.delete move one unchanged displayed file to OS trash
  *
  * The list has two sources:
  *
@@ -21,11 +22,13 @@
  * Folding Session logs is the expensive part, so it never blocks the list: the
  * first response carries the filesystem scan immediately, the fold runs in the
  * background, and the payload flags `presentPending` so the panel re-asks. No
- * Session log is ever written; this module only reads.
+ * Session log is ever written; file deletion is explicit and recoverable.
  * @module dsh-recent-deliverables
  */
 import { createReadStream } from 'node:fs'
-import { readdir, realpath, stat } from 'node:fs/promises'
+import { readdir, realpath, stat, lstat } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import trash from 'trash'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import {
@@ -52,9 +55,8 @@ export const inject = ['connection']
 const LIST_PATH = '/api/recent-deliverables.list'
 const FILE_PATH = '/api/recent-deliverables.file'
 const OPEN_PATH = '/api/recent-deliverables.open'
+const DELETE_PATH = '/api/recent-deliverables.delete'
 
-/** How many Session fold results are memoized before the oldest entry is dropped. */
-const SESSION_CACHE_LIMIT = 96
 /** How many Session titles are memoized before the oldest entry is dropped. */
 const TITLE_CACHE_LIMIT = 512
 /** Milliseconds a folded Session title stays fresh. */
@@ -73,7 +75,13 @@ const MIN_ROOT_BUDGET = 200
  * @param ctx - Host context carrying the connection Fetch registry.
  * @param config - optional Loader row config (see README.md).
  */
-export function apply(ctx, config) {
+export function createPlugin(trashFile = trash) {
+  return (ctx, config) => mount(ctx, config, trashFile)
+}
+
+export const apply = createPlugin()
+
+function mount(ctx, config, trashFile) {
   const options = normalizeConfig(config)
   const lifetime = new AbortController()
   const state = {
@@ -94,6 +102,9 @@ export function apply(ctx, config) {
     titles: new Map(),
     files: { at: 0, rootsKey: '', items: [], visited: 0, truncated: false },
     servable: new Set(),
+    deleteTickets: new Map(),
+    deleting: new Set(),
+    revision: 0,
   }
 
   ctx.effect(
@@ -134,6 +145,13 @@ export function apply(ctx, config) {
     requestBody: 'buffered',
     fetch: serve((request) => openResponse(ctx, state, request)),
   })
+  ctx.connection.fetch.register({
+    path: DELETE_PATH,
+    methods: ['POST'],
+    requestBody: 'buffered',
+    fetch: serve((request) => deleteResponse(state, request, trashFile)),
+  })
+
 }
 
 // ---------------------------------------------------------------------------
@@ -156,22 +174,22 @@ function json(body, status = 200) {
  * @returns the JSON response.
  */
 async function listResponse(ctx, state, request) {
-  const cached = state.list.value
-  if (cached !== null && Date.now() - state.list.at < state.options.cacheMs) return json(cached)
-  if (state.building !== null) {
-    const shared = await state.building
-    return json(shared.value)
-  }
-  state.building = buildList(ctx, state)
-  try {
-    const built = await state.building
-    if (built.cache) state.list = { at: Date.now(), value: built.value }
-    return json(built.value)
-  } catch (error) {
-    if (state.list.value !== null) return json(state.list.value)
-    throw error
-  } finally {
-    state.building = null
+  for (;;) {
+    const cached = state.list.value
+    if (cached !== null && Date.now() - state.list.at < state.options.cacheMs) return json(cached)
+    const building = state.building ?? (state.building = buildList(ctx, state))
+    try {
+      const built = await building
+      // A deletion may have completed while a filesystem scan was in flight.
+      if (built.revision !== state.revision) continue
+      if (built.cache) state.list = { at: Date.now(), value: built.value }
+      return json(built.value)
+    } catch (error) {
+      if (state.list.value !== null) return json(state.list.value)
+      throw error
+    } finally {
+      if (state.building === building) state.building = null
+    }
   }
 }
 
@@ -184,6 +202,7 @@ async function listResponse(ctx, state, request) {
  */
 async function buildList(ctx, state) {
   const started = Date.now()
+  const revision = state.revision
   const options = state.options
   const summaries = await loadSessionSummaries(ctx, state)
   const roots = resolveRoots(ctx, summaries, options)
@@ -194,24 +213,24 @@ async function buildList(ctx, state) {
   const fold = options.includePresent ? ensurePresentFold(ctx, state, summaries) : undefined
   const files = options.includeFiles ? await scanRoots(state, roots) : []
   const declared = state.present.items
-  const merged = mergeDeliverables(declared, files, options.maxItems, options.declaredSlots)
-  const items = merged.items.map(publicItem).filter(Boolean)
-  const pending = fold !== undefined && state.present.status !== 'ready'
-
-  // Only paths this Host actually listed may be streamed or opened by the
-  // browser; the Set is rebuilt on every collection.
+  const candidates = mergeDeliverables(declared, files, 0, options.declaredSlots).items
   const canonicalRoots = (await Promise.all(roots.map(async (root) => {
     try { return await realpath(root.path) } catch { return undefined }
   }))).filter(Boolean)
-  state.servable = new Set((await Promise.all(merged.items.map(async (item) => {
-    try {
-      const target = await realpath(item.path)
-      return item.origin === 'present' || canonicalRoots.some((root) => isPathInside(root, target))
-        ? target : undefined
-    } catch { return undefined }
-  }))).filter(Boolean))
+  const live = await collectLiveFiles(candidates, canonicalRoots, state.deleteTickets)
+  const merged = mergeDeliverables(live.filter((item) => item.origin === 'present'),
+    live.filter((item) => item.origin !== 'present'), options.maxItems, options.declaredSlots)
+  const items = merged.items.map(publicItem).filter(Boolean)
+  const pending = fold !== undefined && state.present.status !== 'ready'
+  if (revision === state.revision) {
+    state.servable = new Set(merged.items.map((item) => item.canonical))
+    state.deleteTickets = new Map(merged.items.map((item) => [item.path, item.ticket]))
+  }
+  const sessionIds = new Set(summaries.map((row) => row.sessionId))
+  for (const id of state.sessions.keys()) if (!sessionIds.has(id)) state.sessions.delete(id)
 
   return {
+    revision,
     cache: pending !== true,
     value: {
       items,
@@ -245,6 +264,7 @@ function describeCapabilities(ctx) {
   return {
     open: available,
     reveal: available,
+    trash: true,
     desktop: typeof desktop?.name === 'string' ? desktop.name : null,
   }
 }
@@ -313,9 +333,8 @@ async function loadSessionSummaries(ctx, state) {
  */
 function foldCandidates(summaries, options) {
   const cutoff = options.maxSessionAgeDays > 0 ? Date.now() - options.maxSessionAgeDays * 86400000 : 0
-  return summaries
-    .filter((summary) => !summary.blank && summary.updatedAt >= cutoff)
-    .slice(0, options.maxSessions)
+  const candidates = summaries.filter((summary) => !summary.blank && summary.updatedAt >= cutoff)
+  return options.maxSessions > 0 ? candidates.slice(0, options.maxSessions) : candidates
 }
 
 /** A stable description of the fold inputs, so unchanged inputs skip the fold. */
@@ -336,7 +355,6 @@ function ensurePresentFold(ctx, state, summaries) {
   const query = ctx.get('sessionQuery')
   if (query === undefined || typeof query.listEvents !== 'function') return undefined
   const options = state.options
-  if (options.maxSessions === 0) return undefined
   const candidates = foldCandidates(summaries, options)
   const signature = foldSignature(candidates)
   const now = Date.now()
@@ -450,12 +468,6 @@ async function presentOfSession(state, query, summary) {
     // declared deliverables to report.
   }
   state.sessions.set(summary.sessionId, { updatedAt: summary.updatedAt, items })
-  if (state.sessions.size > SESSION_CACHE_LIMIT) {
-    for (const key of state.sessions.keys()) {
-      if (state.sessions.size <= SESSION_CACHE_LIMIT) break
-      state.sessions.delete(key)
-    }
-  }
   return items
 }
 
@@ -544,7 +556,7 @@ function resolveRoots(ctx, summaries, options) {
   }
   const working = ctx.get('workingDirectory')
   if (working !== undefined && typeof working.defaultDirectory === 'string') add(working.defaultDirectory, '')
-  for (const summary of summaries.slice(0, Math.max(options.maxSessions, 1))) add(summary.cwd, '')
+  for (const summary of (options.maxSessions > 0 ? summaries.slice(0, options.maxSessions) : summaries)) add(summary.cwd, '')
   for (const extra of options.extraRoots) add(extra, '')
   return [...roots.values()].map(({ path, label }) => ({ path, label }))
 }
@@ -566,14 +578,15 @@ async function scanRoots(state, roots) {
   const items = []
   let visited = 0
   let truncated = false
-  const perRoot = Math.max(MIN_ROOT_BUDGET, Math.ceil(options.maxScanFiles / Math.max(roots.length, 1)))
+  const budget = options.maxScanFiles > 0 ? options.maxScanFiles : Infinity
+  const perRoot = Math.max(MIN_ROOT_BUDGET, Math.ceil(budget / Math.max(roots.length, 1)))
 
   for (const root of roots) {
-    if (visited >= options.maxScanFiles) {
+    if (visited >= budget) {
       truncated = true
       break
     }
-    const share = Math.min(perRoot, options.maxScanFiles - visited)
+    const share = Math.min(perRoot, budget - visited)
     let used = 0
     await walkRoot(root, options.scanDepth, options.extensions, {
       exhausted: () => used >= share || state.signal.aborted,
@@ -759,5 +772,87 @@ async function openResponse(ctx, state, request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return json({ error: 'open-failed', message }, 502)
+  }
+}
+
+
+function identityOf(link, target) {
+  return [link.dev, link.ino, link.size, link.mtimeMs, link.ctimeMs, link.mode,
+    target.dev, target.ino, target.size, target.mtimeMs, target.ctimeMs].join(':')
+}
+
+async function fileRecord(path) {
+  const link = await lstat(path)
+  if (!link.isFile() && !link.isSymbolicLink()) return undefined
+  const canonical = await realpath(path)
+  const target = await stat(canonical)
+  if (!target.isFile()) return undefined
+  return { canonical, identity: identityOf(link, target), bytes: target.size, mtime: Math.round(target.mtimeMs) }
+}
+
+/** Eight workers keep unbounded lists from opening thousands of files at once. */
+async function collectLiveFiles(candidates, roots, previousTickets) {
+  const result = new Array(candidates.length)
+  let cursor = 0
+  await Promise.all(Array.from({ length: Math.min(8, candidates.length) }, async () => {
+    for (;;) {
+      const index = cursor++
+      if (index >= candidates.length) return
+      const item = candidates[index]
+      try {
+        const record = await fileRecord(item.path)
+        if (!record || (item.origin !== 'present' && !roots.some((root) => isPathInside(root, record.canonical)))) continue
+        const previous = previousTickets.get(item.path)
+        const token = previous?.canonical === record.canonical && previous.identity === record.identity
+          ? previous.token : randomUUID()
+        result[index] = { ...item, ...record, deleteToken: token,
+          ticket: { ...record, token } }
+      } catch { /* a missing or unreadable file is no longer a current deliverable */ }
+    }
+  }))
+  return result.filter(Boolean)
+}
+
+/** Move exactly one displayed, unchanged regular file (or its link) to OS trash. */
+async function deleteResponse(state, request, trashFile) {
+  if (request.method !== 'POST') return json({ error: 'method-not-allowed' }, 405)
+  if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json')) {
+    return json({ error: 'json-required' }, 415)
+  }
+  let body
+  try {
+    const text = await request.text()
+    if (text.length > 16384) return json({ error: 'body-too-large' }, 413)
+    body = JSON.parse(text)
+  } catch { return json({ error: 'bad-json' }, 400) }
+  const path = typeof body?.path === 'string' ? body.path : ''
+  const ticket = state.deleteTickets.get(path)
+  if (!ticket || typeof body.token !== 'string' || body.token !== ticket.token) {
+    return json({ error: 'not-listed' }, 403)
+  }
+  if (state.deleting.has(path)) return json({ error: 'delete-busy' }, 409)
+  state.deleting.add(path)
+  try {
+    let current
+    try { current = await fileRecord(path) } catch { return json({ error: 'not-found' }, 404) }
+    if (!current || current.canonical !== ticket.canonical || current.identity !== ticket.identity) {
+      return json({ error: 'file-changed' }, 409)
+    }
+    // Do not expand glob characters, follow the link, or fall back to hard deletion.
+    await trashFile(path, { glob: false })
+    state.revision += 1
+    state.deleteTickets.delete(path)
+    state.servable.delete(ticket.canonical)
+    state.list = { at: 0, value: null }
+    state.files.at = 0
+    state.present.items = state.present.items.filter((item) => item.path !== path)
+    state.present.builtAt = 0
+    state.present.signature = ''
+    state.present.generation += 1
+    return json({ deleted: true, path, recoverable: true })
+  } catch (error) {
+    return json({ error: 'trash-failed', message: error instanceof Error ? error.message : String(error) }, 502)
+  } finally {
+    state.deleting.delete(path)
   }
 }

@@ -269,7 +269,7 @@ export function compareByMtimeDesc(left, right) {
  * to `maxItems`.
  * @param present - items carrying `origin: 'present'` plus declarations.
  * @param files - items carrying `origin: 'file'`.
- * @param maxItems - hard cap on the returned list length.
+ * @param maxItems - optional positive cap; zero/omitted means unlimited.
  * @param declaredSlots - reserved declared items kept ahead of the fill (default 12).
  * @returns the merged list and the counts the footer reports.
  */
@@ -300,7 +300,7 @@ export function mergeDeliverables(present, files, maxItems, declaredSlots) {
     })
   }
   const all = [...merged.values()].sort(compareByMtimeDesc)
-  const cap = Number.isSafeInteger(maxItems) && maxItems > 0 ? maxItems : 40
+  const cap = Number.isSafeInteger(maxItems) && maxItems > 0 ? maxItems : all.length
   const slots =
     Number.isSafeInteger(declaredSlots) && declaredSlots >= 0 ? Math.min(declaredSlots, cap) : Math.min(12, cap)
   const declaredItems = all.filter((item) => item.origin === 'present')
@@ -356,12 +356,12 @@ export function normalizeConfig(config) {
     ? source.ignoreRoots.filter((value) => typeof value === 'string' && value.trim().length > 0)
     : []
   return {
-    maxItems: integer(source.maxItems, 40, 1, 200),
+    maxItems: integer(source.maxItems, 0, 0, Number.MAX_SAFE_INTEGER),
     declaredSlots: integer(source.declaredSlots, 12, 0, 200),
-    maxSessions: integer(source.maxSessions, 16, 0, 200),
-    maxSessionAgeDays: integer(source.maxSessionAgeDays, 60, 0, 3650),
+    maxSessions: integer(source.maxSessions, 0, 0, Number.MAX_SAFE_INTEGER),
+    maxSessionAgeDays: integer(source.maxSessionAgeDays, 0, 0, 3650),
     scanDepth: integer(source.scanDepth, 5, 0, 20),
-    maxScanFiles: integer(source.maxScanFiles, 12000, 100, 200000),
+    maxScanFiles: integer(source.maxScanFiles, 0, 0, Number.MAX_SAFE_INTEGER),
     cacheMs: integer(source.cacheMs, 15000, 0, 600000),
     includePresent: source.includePresent !== false,
     includeFiles: source.includeFiles !== false,
@@ -391,6 +391,7 @@ export function publicItem(item) {
     mtime: Number.isFinite(item.mtime) ? item.mtime : 0,
     origin: declared ? 'present' : 'file',
     previewable: mediaOfPath(path).inline,
+    ...(typeof item.deleteToken === 'string' ? { deleteToken: item.deleteToken } : {}),
     ...(typeof item.description === 'string' && item.description.length > 0
       ? { description: item.description }
       : {}),
