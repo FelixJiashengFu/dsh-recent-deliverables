@@ -23,6 +23,9 @@ window.__ModuleLoader__.load({
     const OPEN_URL = 'api/recent-deliverables.open'
     /** Browser-local UI state (never synced). */
     const STORAGE_KEY = 'dsh.recent-deliverables.v1'
+    const AVATAR_PRESETS = ['🐱', '🐶', '🐰', '🦊', '🐼', '🤖', '🦄', '🐸']
+    const AVATAR_MAX_BYTES = 2 * 1024 * 1024
+    const AVATAR_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
     /** Refresh cadence while the page is visible; the Host memoizes for 15 s. */
     const POLL_MS = 20000
     /** Slower cadence while the panel is collapsed to its pill. */
@@ -85,6 +88,26 @@ window.__ModuleLoader__.load({
 
     const DICTIONARY = {
       en: {
+        'settings.title': 'Appearance & language',
+        'settings.open': 'Customize character and language',
+        'settings.back': 'Back to files',
+        'settings.language': 'Language / 语言',
+        'settings.auto': 'Follow DSH',
+        'settings.character': 'Your character',
+        'settings.characterHint': 'Choose a character, enter an emoji, or use your own cartoon image.',
+        'settings.default': 'Original icon',
+        'settings.custom': 'Custom emoji or text',
+        'settings.customPlaceholder': 'For example: 🐯',
+        'settings.upload': 'Choose an image',
+        'settings.uploadHint': 'PNG, JPG, WebP or GIF · up to 2 MB · stored on this device',
+        'settings.reset': 'Reset character',
+        'settings.imageTooLarge': 'Choose an image smaller than 2 MB.',
+        'settings.imageInvalid': 'This image could not be read. Try PNG, JPG, WebP or GIF.',
+        'settings.notSaved': 'Applied for now, but this browser could not save the setting.',
+        'settings.switchEnglish': 'Switch to English',
+        'settings.switchChinese': '切换为中文',
+        'settings.outsideHint': 'Click outside to collapse into a capsule.',
+        'settings.uploading': 'Reading image…',
         'title': 'Deliverables',
         'subtitle': 'Files you produced most recently',
         'search': 'Search files',
@@ -166,6 +189,26 @@ window.__ModuleLoader__.load({
         'platform.slack': 'Slack',
       },
       zh: {
+        'settings.title': '外观与语言',
+        'settings.open': '自定义卡通形象与语言',
+        'settings.back': '返回文件',
+        'settings.language': '语言 / Language',
+        'settings.auto': '跟随 DSH',
+        'settings.character': '我的卡通形象',
+        'settings.characterHint': '选择一个形象、输入表情，或使用自己的卡通图片。',
+        'settings.default': '原始图标',
+        'settings.custom': '自定义表情或文字',
+        'settings.customPlaceholder': '例如：🐯',
+        'settings.upload': '选择图片',
+        'settings.uploadHint': 'PNG、JPG、WebP 或 GIF · 最大 2 MB · 仅保存在本机',
+        'settings.reset': '恢复原始图标',
+        'settings.imageTooLarge': '请选择小于 2 MB 的图片。',
+        'settings.imageInvalid': '无法读取这张图片，请尝试 PNG、JPG、WebP 或 GIF。',
+        'settings.notSaved': '本次已应用，但浏览器未能保存这项设置。',
+        'settings.switchEnglish': 'Switch to English',
+        'settings.switchChinese': '切换为中文',
+        'settings.outsideHint': '点击浮窗外即可收成胶囊。',
+        'settings.uploading': '正在读取图片…',
         'title': '成品',
         'subtitle': '最近做出来的文件',
         'search': '搜索文件名',
@@ -255,7 +298,9 @@ window.__ModuleLoader__.load({
     /** Client locale service, once it activates. */
     let localeService = null
     /** Active language for the built-in fallback dictionary. */
-    let activeLanguage = detectLanguage()
+    let hostLanguage = detectLanguage()
+    let languageOverride = loadUiState().language
+    let activeLanguage = languageOverride === 'auto' ? hostLanguage : languageOverride
     /** Client face of the Host `session` Remote namespace, once it mounts. */
     let sessionRemote = null
     /** The plugin's own client Context, kept for lazy service lookups. */
@@ -277,7 +322,7 @@ window.__ModuleLoader__.load({
      * built-in dictionary. `params` interpolates `{name}` placeholders.
      */
     function t(key, params) {
-      if (localeService !== null) {
+      if (localeService !== null && languageOverride === 'auto') {
         try {
           const value = localeService.bind(NAME_SPACE)(key, params)
           if (typeof value === 'string' && value !== key) return value
@@ -640,22 +685,36 @@ window.__ModuleLoader__.load({
     // UI state persistence
     // -----------------------------------------------------------------------
 
+    function normalizeAvatar(value) {
+      if (value?.kind === 'emoji' && typeof value.value === 'string' && value.value.trim()) {
+        return { kind: 'emoji', value: value.value.trim().slice(0, 32) }
+      }
+      if (value?.kind === 'image' && typeof value.value === 'string' && value.value.length <= 2800000 &&
+          /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(value.value)) {
+        return { kind: 'image', value: value.value }
+      }
+      return { kind: 'default', value: '' }
+    }
+
+    function normalizeUiState(value) {
+      const parsed = value !== null && typeof value === 'object' ? value : {}
+      const filter = typeof parsed.filter === 'string' ? parsed.filter : 'all'
+      const allowed = filter === 'all' || filter === 'present' || KIND_FILTERS.includes(filter)
+      return {
+        collapsed: parsed.collapsed === true,
+        filter: allowed ? filter : 'all',
+        right: Number.isFinite(parsed.right) ? parsed.right : null,
+        top: Number.isFinite(parsed.top) ? parsed.top : null,
+        language: parsed.language === 'zh' || parsed.language === 'en' ? parsed.language : 'auto',
+        avatar: normalizeAvatar(parsed.avatar),
+      }
+    }
+
     function loadUiState() {
       try {
-        const raw = window.localStorage.getItem(STORAGE_KEY)
-        if (raw === null) return { collapsed: false, filter: 'all', right: null, top: null }
-        const parsed = JSON.parse(raw)
-        if (parsed === null || typeof parsed !== 'object') return { collapsed: false, filter: 'all', right: null, top: null }
-        const filter = typeof parsed.filter === 'string' ? parsed.filter : 'all'
-        const allowed = filter === 'all' || filter === 'present' || KIND_FILTERS.includes(filter)
-        return {
-          collapsed: parsed.collapsed === true,
-          filter: allowed ? filter : 'all',
-          right: Number.isFinite(parsed.right) ? parsed.right : null,
-          top: Number.isFinite(parsed.top) ? parsed.top : null,
-        }
+        return normalizeUiState(JSON.parse(window.localStorage.getItem(STORAGE_KEY)))
       } catch {
-        return { collapsed: false, filter: 'all', right: null, top: null }
+        return normalizeUiState(null)
       }
     }
 
@@ -663,9 +722,44 @@ window.__ModuleLoader__.load({
       try {
         const current = loadUiState()
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...current, ...patch }))
+        return true
       } catch {
-        // Private mode: state simply stays in memory.
+        return false
       }
+    }
+
+    /** Owned previews and controls are inside the same root, including shadow paths. */
+    function outsidePanel(event, root) {
+      if (!root || !event?.target) return false
+      if (typeof event.composedPath === 'function' && event.composedPath().includes(root)) return false
+      return !root.contains(event.target)
+    }
+
+    function characterImage(file) {
+      return new Promise((resolve, reject) => {
+        if (!file || !AVATAR_IMAGE_TYPES.includes(file.type)) { reject(new Error('imageInvalid')); return }
+        if (file.size > AVATAR_MAX_BYTES) { reject(new Error('imageTooLarge')); return }
+        const reader = new FileReader()
+        reader.onerror = () => reject(new Error('imageInvalid'))
+        reader.onload = () => {
+          const avatar = normalizeAvatar({ kind: 'image', value: reader.result })
+          if (avatar.kind !== 'image') { reject(new Error('imageInvalid')); return }
+          const image = new Image()
+          image.onerror = () => reject(new Error('imageInvalid'))
+          image.onload = () => {
+            if (!image.naturalWidth || !image.naturalHeight) reject(new Error('imageInvalid'))
+            else resolve(avatar)
+          }
+          image.src = avatar.value
+        }
+        reader.readAsDataURL(file)
+      })
+    }
+
+    function Character({ avatar, size = 20 }) {
+      if (avatar.kind === 'image') return h('img', { src: avatar.value, alt: '', className: 'rd-avatar-image' })
+      if (avatar.kind === 'emoji') return h('span', { className: 'rd-avatar-emoji', 'aria-hidden': 'true' }, avatar.value)
+      return h(Icon, { name: 'stack', size })
     }
 
     // -----------------------------------------------------------------------
@@ -691,6 +785,28 @@ window.__ModuleLoader__.load({
 .rd-root[data-dragging="true"] .rd-head,.rd-root[data-dragging="true"] .rd-pill{cursor:grabbing}
 .rd-root[data-dragging="true"]{animation:none}
 .rd-mark{flex:none;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;color:var(--rd-accent);background:color-mix(in srgb,var(--rd-accent) 12%,transparent)}
+.rd-mark-button{border:0;padding:0;cursor:pointer;font:inherit;overflow:hidden}
+.rd-mark-button:hover{box-shadow:0 0 0 2px color-mix(in srgb,var(--rd-accent) 45%,transparent)}
+.rd-mark-button:focus-visible{outline:2px solid var(--rd-accent);outline-offset:3px}
+.rd-avatar-image{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
+.rd-avatar-emoji{font-size:20px;line-height:1;overflow:hidden;max-width:100%;text-overflow:ellipsis;white-space:nowrap}
+.rd-pill-mark{overflow:hidden}
+.rd-pill-mark .rd-avatar-emoji{font-size:15px}
+.rd-lang{width:28px;font-size:10px;font-weight:650;font-family:inherit}
+.rd-settings{padding:0 14px 14px;overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.rd-settings-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-top:2px}
+.rd-settings-title{font-weight:600;font-size:13px;color:var(--rd-ink)}
+.rd-settings-group{display:flex;flex-direction:column;gap:8px}
+.rd-settings-label{font-size:11px;font-weight:600;color:var(--rd-ink-2)}
+.rd-settings-hint{font-size:10.5px;color:var(--rd-ink-3);line-height:1.6;margin:0}
+.rd-settings-languages{display:flex;gap:5px;flex-wrap:wrap}
+.rd-settings-choice{border:1px solid var(--rd-line);border-radius:8px;background:var(--rd-canvas);color:var(--rd-ink-2);font:inherit;cursor:pointer;padding:6px 10px}
+.rd-settings-choice[aria-pressed="true"]{border-color:var(--rd-accent);color:var(--rd-accent);background:color-mix(in srgb,var(--rd-accent) 10%,var(--rd-surface))}
+.rd-settings-choice:focus-visible{outline:2px solid var(--rd-accent);outline-offset:2px}
+.rd-avatar-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.rd-avatar-choice{height:42px;display:grid;place-items:center;font-size:24px;padding:0}
+.rd-settings-custom{padding:0 9px;font-size:14px;height:32px}
+.rd-settings-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .rd-heading{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;padding-top:1px}
 .rd-title{font-family:var(--rd-serif);font-size:15px;font-weight:600;letter-spacing:.005em;color:var(--rd-ink);display:flex;align-items:center;gap:6px}
 .rd-count{font-family:var(--dsw-font-family,inherit);font-size:10px;font-weight:600;letter-spacing:.02em;color:var(--rd-accent);background:color-mix(in srgb,var(--rd-accent) 13%,transparent);border-radius:999px;padding:1px 6px;line-height:1.5}
@@ -810,6 +926,10 @@ window.__ModuleLoader__.load({
     function Panel() {
       const [snapshot, setSnapshot] = React.useState(store.get)
       const [ui, setUi] = React.useState(loadUiState)
+      const [settingsOpen, setSettingsOpen] = React.useState(false)
+      const [avatarLoading, setAvatarLoading] = React.useState(false)
+      const avatarFileRef = React.useRef(null)
+      const settingsButtonRef = React.useRef(null)
       const [query, setQuery] = React.useState('')
       const [preview, setPreview] = React.useState(null)
       const [pending, setPending] = React.useState(null)
@@ -868,6 +988,48 @@ window.__ModuleLoader__.load({
           document.removeEventListener('visibilitychange', onVisible)
         }
       }, [ui.collapsed])
+
+      // Capture observes outside clicks without cancelling the underlying action.
+      React.useEffect(() => {
+        if (ui.collapsed) return undefined
+        const onOutside = (event) => {
+          if (dragState.current !== null || !outsidePanel(event, rootRef.current)) return
+          setUi((current) => ({ ...current, collapsed: true }))
+          saveUiState({ collapsed: true })
+          setSettingsOpen(false)
+          forwardToken.current += 1
+          setForward(null)
+          setRemoving(null)
+        }
+        let frameTimer = null
+        const onFrameFocus = () => {
+          if (frameTimer !== null) window.clearTimeout(frameTimer)
+          // Pointer events inside another iframe do not bubble to this document.
+          frameTimer = window.setTimeout(() => {
+            const focused = document.activeElement
+            if (focused?.tagName === 'IFRAME') onOutside({ target: focused })
+          }, 0)
+        }
+        document.addEventListener('pointerdown', onOutside, true)
+        window.addEventListener('blur', onFrameFocus)
+        return () => {
+          document.removeEventListener('pointerdown', onOutside, true)
+          window.removeEventListener('blur', onFrameFocus)
+          if (frameTimer !== null) window.clearTimeout(frameTimer)
+        }
+      }, [ui.collapsed])
+
+      React.useEffect(() => {
+        if (!settingsOpen) return undefined
+        const onKey = (event) => {
+          if (event.key !== 'Escape') return
+          event.stopPropagation()
+          setSettingsOpen(false)
+          settingsButtonRef.current?.focus()
+        }
+        window.addEventListener('keydown', onKey, true)
+        return () => window.removeEventListener('keydown', onKey, true)
+      }, [settingsOpen])
 
       // Escape closes the preview; focus moves into the dialog when it opens.
       React.useEffect(() => {
@@ -942,7 +1104,7 @@ window.__ModuleLoader__.load({
         clamp()
         window.addEventListener('resize', clamp)
         return () => window.removeEventListener('resize', clamp)
-      }, [ui.collapsed])
+      }, [ui.collapsed, settingsOpen, ui.language])
 
       const showToast = (text) => {
         setToast(text)
@@ -1036,12 +1198,41 @@ window.__ModuleLoader__.load({
         }
       }
 
+      const updatePreference = (patch) => {
+        const saved = saveUiState(patch)
+        setUi((current) => ({ ...current, ...patch }))
+        if (!saved) showToast(t('settings.notSaved'))
+      }
+
+      const changeLanguage = (language) => {
+        languageOverride = language === 'zh' || language === 'en' ? language : 'auto'
+        activeLanguage = languageOverride === 'auto' ? hostLanguage : languageOverride
+        updatePreference({ language: languageOverride })
+        localeChanged()
+      }
+
+      const uploadCharacter = async (event) => {
+        const file = event.target.files?.[0]
+        event.target.value = ''
+        if (!file) return
+        setAvatarLoading(true)
+        try {
+          const avatar = await characterImage(file)
+          updatePreference({ avatar })
+        } catch (error) {
+          showToast(t(error?.message === 'imageTooLarge' ? 'settings.imageTooLarge' : 'settings.imageInvalid'))
+        } finally {
+          setAvatarLoading(false)
+        }
+      }
+
       const toggleCollapsed = () => {
         suppressClick.current = false
         const next = !ui.collapsed
-        setUi({ ...ui, collapsed: next })
+        setUi((current) => ({ ...current, collapsed: next }))
         saveUiState({ collapsed: next })
         if (next) {
+          setSettingsOpen(false)
           forwardToken.current += 1
           setForward(null)
         } else {
@@ -1295,7 +1486,7 @@ window.__ModuleLoader__.load({
               title: t('expand'),
               'aria-label': `${t('expand')} (${counts.all})`,
             },
-            h('span', { className: 'rd-pill-mark' }, h(Icon, { name: 'stack', size: 13 })),
+            h('span', { className: 'rd-pill-mark' }, h(Character, { avatar: ui.avatar, size: 13 })),
             h('span', null, t('title')),
             counts.all > 0 ? h('span', { className: 'rd-pill-n' }, String(counts.all)) : null,
             fresh ? h('span', { className: 'rd-fresh', 'aria-hidden': 'true' }) : null,
@@ -1342,7 +1533,12 @@ window.__ModuleLoader__.load({
                 if (!dragExcluded(event.target, event.currentTarget)) resetPosition()
               },
             },
-            h('span', { className: 'rd-mark', 'aria-hidden': 'true' }, h(Icon, { name: 'stack', size: 14 })),
+            h('button', {
+              className: 'rd-mark rd-mark-button', type: 'button',
+              ref: settingsButtonRef, title: t('settings.open'), 'aria-label': t('settings.open'),
+              'aria-expanded': settingsOpen, 'aria-controls': 'rd-settings',
+              onClick: () => setSettingsOpen((open) => !open),
+            }, h(Character, { avatar: ui.avatar, size: 14 })),
             h(
               'span',
               { className: 'rd-heading' },
@@ -1357,6 +1553,12 @@ window.__ModuleLoader__.load({
             h(
               'span',
               { className: 'rd-head-actions' },
+              h('button', {
+                className: 'rd-icon rd-lang', type: 'button',
+                title: t(activeLanguage === 'zh' ? 'settings.switchEnglish' : 'settings.switchChinese'),
+                'aria-label': t(activeLanguage === 'zh' ? 'settings.switchEnglish' : 'settings.switchChinese'),
+                onClick: () => changeLanguage(activeLanguage === 'zh' ? 'en' : 'zh'),
+              }, activeLanguage === 'zh' ? 'EN' : '中'),
               h(
                 'button',
                 {
@@ -1382,107 +1584,146 @@ window.__ModuleLoader__.load({
               ),
             ),
           ),
-          h(
-            'div',
-            { className: 'rd-tools' },
-            h(
-              'label',
-              { className: 'rd-search' },
-              h(Icon, { name: 'search', size: 13 }),
-              h('input', {
-                className: 'rd-input',
-                type: 'search',
-                value: query,
-                placeholder: t('search'),
-                'aria-label': t('search'),
-                onChange: (event) => setQuery(event.target.value),
-              }),
-            ),
+          settingsOpen ? renderSettings() : h(React.Fragment, null,
             h(
               'div',
-              { className: 'rd-chips', role: 'group', 'aria-label': t('title') },
-              filters.map((filter) =>
-                h(
-                  'button',
-                  {
-                    key: filter.key,
-                    type: 'button',
-                    className: 'rd-chip',
-                    'aria-pressed': ui.filter === filter.key ? 'true' : 'false',
-                    onClick: () => selectFilter(filter.key),
-                  },
-                  filter.label,
-                  h('span', { className: 'rd-chip-n' }, String(filter.count)),
+              { className: 'rd-tools' },
+              h(
+                'label',
+                { className: 'rd-search' },
+                h(Icon, { name: 'search', size: 13 }),
+                h('input', {
+                  className: 'rd-input',
+                  type: 'search',
+                  value: query,
+                  placeholder: t('search'),
+                  'aria-label': t('search'),
+                  onChange: (event) => setQuery(event.target.value),
+                }),
+              ),
+              h(
+                'div',
+                { className: 'rd-chips', role: 'group', 'aria-label': t('title') },
+                filters.map((filter) =>
+                  h(
+                    'button',
+                    {
+                      key: filter.key,
+                      type: 'button',
+                      className: 'rd-chip',
+                      'aria-pressed': ui.filter === filter.key ? 'true' : 'false',
+                      onClick: () => selectFilter(filter.key),
+                    },
+                    filter.label,
+                    h('span', { className: 'rd-chip-n' }, String(filter.count)),
+                  ),
                 ),
               ),
             ),
-          ),
-          (snapshot.status === 'loading' || snapshot.status === 'idle') && items.length === 0
-            ? h(
-                'div',
-                { className: 'rd-status', role: 'status' },
-                h('span', { className: 'rd-spinner', 'aria-hidden': 'true' }),
-                h('span', null, t('loading')),
-              )
-            : snapshot.status === 'error'
+            (snapshot.status === 'loading' || snapshot.status === 'idle') && items.length === 0
               ? h(
                   'div',
-                  { className: 'rd-status', role: 'alert' },
-                  h(Icon, { name: 'spark', size: 18 }),
-                  h('span', null, t('error.title')),
-                  h('span', { style: { opacity: 0.7 } }, snapshot.error || ''),
-                  h(
-                    'button',
-                    { className: 'rd-link', type: 'button', onClick: () => store.load() },
-                    t('retry'),
-                  ),
+                  { className: 'rd-status', role: 'status' },
+                  h('span', { className: 'rd-spinner', 'aria-hidden': 'true' }),
+                  h('span', null, t('loading')),
                 )
-              : visible.length === 0
+              : snapshot.status === 'error'
                 ? h(
                     'div',
-                    { className: 'rd-empty' },
+                    { className: 'rd-status', role: 'alert' },
+                    h(Icon, { name: 'spark', size: 18 }),
+                    h('span', null, t('error.title')),
+                    h('span', { style: { opacity: 0.7 } }, snapshot.error || ''),
                     h(
-                      'span',
-                      { className: 'rd-empty-icon', 'aria-hidden': 'true' },
-                      h(Icon, { name: 'spark', size: 17 }),
-                    ),
-                    h(
-                      'span',
-                      { className: 'rd-empty-title' },
-                      items.length === 0 ? t('empty.title') : t('empty.filtered'),
-                    ),
-                    h(
-                      'span',
-                      { className: 'rd-empty-hint' },
-                      items.length === 0 ? t('empty.hint') : '',
+                      'button',
+                      { className: 'rd-link', type: 'button', onClick: () => store.load() },
+                      t('retry'),
                     ),
                   )
-                : h('div', { className: 'rd-list', role: 'list' }, rows),
-          h(
-            'footer',
-            { className: 'rd-foot' },
+                : visible.length === 0
+                  ? h(
+                      'div',
+                      { className: 'rd-empty' },
+                      h(
+                        'span',
+                        { className: 'rd-empty-icon', 'aria-hidden': 'true' },
+                        h(Icon, { name: 'spark', size: 17 }),
+                      ),
+                      h(
+                        'span',
+                        { className: 'rd-empty-title' },
+                        items.length === 0 ? t('empty.title') : t('empty.filtered'),
+                      ),
+                      h(
+                        'span',
+                        { className: 'rd-empty-hint' },
+                        items.length === 0 ? t('empty.hint') : '',
+                      ),
+                    )
+                  : h('div', { className: 'rd-list', role: 'list' }, rows),
             h(
-              'span',
-              { className: 'rd-foot-text' },
-              (snapshot.status === 'loading' || snapshot.status === 'idle') && items.length === 0
-                ? t('footer.loading')
-                : [
-                    t('footer.count', { n: stats?.shown ?? items.length }),
-                    stats !== null && stats.roots > 0 ? h('span', { className: 'rd-dot', key: 'd1' }) : null,
-                    stats !== null && stats.roots > 0 ? t('footer.roots', { n: stats.roots }) : null,
-                  ],
+              'footer',
+              { className: 'rd-foot' },
+              h(
+                'span',
+                { className: 'rd-foot-text' },
+                (snapshot.status === 'loading' || snapshot.status === 'idle') && items.length === 0
+                  ? t('footer.loading')
+                  : [
+                      t('footer.count', { n: stats?.shown ?? items.length }),
+                      stats !== null && stats.roots > 0 ? h('span', { className: 'rd-dot', key: 'd1' }) : null,
+                      stats !== null && stats.roots > 0 ? t('footer.roots', { n: stats.roots }) : null,
+                    ],
+              ),
+              h(
+                'span',
+                { className: 'rd-foot-text' },
+                snapshot.loadedAt > 0 ? t('footer.updated', { time: clockOf(snapshot.loadedAt) }) : '',
+              ),
             ),
-            h(
-              'span',
-              { className: 'rd-foot-text' },
-              snapshot.loadedAt > 0 ? t('footer.updated', { time: clockOf(snapshot.loadedAt) }) : '',
-            ),
+            forward !== null ? renderForwardSheet() : null,
           ),
-          forward !== null ? renderForwardSheet() : null,
         ),
         toast !== null ? h('div', { className: 'rd-toast', role: 'status', key: 'toast' }, toast) : null,
         preview !== null ? renderPreview(preview) : null,
       )
+
+      function renderSettings() {
+        return h('div', { className: 'rd-settings', id: 'rd-settings', role: 'group', 'aria-label': t('settings.title') },
+          h('div', { className: 'rd-settings-top' },
+            h('span', { className: 'rd-settings-title' }, t('settings.title')),
+            h('button', { type: 'button', className: 'rd-link', onClick: () => setSettingsOpen(false) }, t('settings.back'))),
+          h('div', { className: 'rd-settings-group' },
+            h('span', { className: 'rd-settings-label' }, t('settings.language')),
+            h('div', { className: 'rd-settings-languages', role: 'group', 'aria-label': t('settings.language') },
+              [['auto', t('settings.auto')], ['zh', '中文'], ['en', 'English']].map(([value, label]) =>
+                h('button', { key: value, type: 'button', className: 'rd-settings-choice',
+                  'aria-pressed': ui.language === value, onClick: () => changeLanguage(value) }, label)))),
+          h('div', { className: 'rd-settings-group' },
+            h('span', { className: 'rd-settings-label' }, t('settings.character')),
+            h('p', { className: 'rd-settings-hint' }, t('settings.characterHint')),
+            h('div', { className: 'rd-avatar-grid', role: 'group', 'aria-label': t('settings.character') },
+              h('button', { type: 'button', className: 'rd-settings-choice rd-avatar-choice',
+                title: t('settings.default'), 'aria-label': t('settings.default'), 'aria-pressed': ui.avatar.kind === 'default',
+                onClick: () => updatePreference({ avatar: normalizeAvatar(null) }) }, h(Icon, { name: 'stack', size: 20 })),
+              AVATAR_PRESETS.map((emoji) => h('button', { key: emoji, type: 'button',
+                className: 'rd-settings-choice rd-avatar-choice', 'aria-label': emoji,
+                'aria-pressed': ui.avatar.kind === 'emoji' && ui.avatar.value === emoji,
+                onClick: () => updatePreference({ avatar: { kind: 'emoji', value: emoji } }) }, emoji))),
+            h('label', { className: 'rd-settings-label', htmlFor: 'rd-avatar-custom' }, t('settings.custom')),
+            h('input', { id: 'rd-avatar-custom', type: 'text', className: 'rd-input rd-settings-custom', maxLength: 32,
+              value: ui.avatar.kind === 'emoji' ? ui.avatar.value : '', placeholder: t('settings.customPlaceholder'),
+              onChange: (event) => updatePreference({ avatar: normalizeAvatar({ kind: 'emoji', value: event.target.value }) }) }),
+            h('div', { className: 'rd-settings-actions' },
+              h('button', { type: 'button', className: 'rd-btn', disabled: avatarLoading,
+                onClick: () => avatarFileRef.current?.click() }, t(avatarLoading ? 'settings.uploading' : 'settings.upload')),
+              h('button', { type: 'button', className: 'rd-link',
+                onClick: () => updatePreference({ avatar: normalizeAvatar(null) }) }, t('settings.reset'))),
+            h('input', { type: 'file', accept: AVATAR_IMAGE_TYPES.join(','), hidden: true,
+              ref: avatarFileRef, onChange: uploadCharacter, 'aria-label': t('settings.upload') }),
+            h('p', { className: 'rd-settings-hint' }, t('settings.uploadHint'))),
+          h('p', { className: 'rd-settings-hint' }, t('settings.outsideHint')))
+      }
 
       function renderRow(item) {
         const hue = KIND_COLOR[item.kind] || KIND_COLOR.other
@@ -1890,10 +2131,11 @@ window.__ModuleLoader__.load({
         const sync = () => {
           try {
             const active = String(locale.getSnapshot?.().active || '').toLowerCase()
-            activeLanguage = active.startsWith('zh') ? 'zh' : 'en'
+            hostLanguage = active.startsWith('zh') ? 'zh' : 'en'
           } catch {
-            activeLanguage = detectLanguage()
+            hostLanguage = detectLanguage()
           }
+          activeLanguage = languageOverride === 'auto' ? hostLanguage : languageOverride
           for (const listener of [...localeListeners]) {
             try {
               listener()

@@ -23,16 +23,8 @@ const source = readFileSync(join(here, '..', 'client.js'), 'utf8')
 
 let passed = 0
 let failed = 0
-function test(name, fn) {
-  try {
-    fn()
-    passed += 1
-    console.log(`ok   ${name}`)
-  } catch (error) {
-    failed += 1
-    console.error(`FAIL ${name}\n     ${error instanceof Error ? error.message : error}`)
-  }
-}
+const cases = []
+function test(name, fn) { cases.push({ name, fn }) }
 
 /** Slice one `function name(...) { ... }` block by counting braces. */
 function extractFunction(name) {
@@ -274,6 +266,70 @@ test('apply tolerates a missing or present remote.session namespace', () => {
   assert.doesNotThrow(() => withRemote.plugin.apply(withRemote.context))
   assert.equal(withRemote.registration().options.id, 'recent-deliverables')
 })
+
+test('old preferences migrate without losing the filter or drag anchor', () => {
+  const helpers = new Function(`${extractConst('KIND_FILTERS')}\n${extractFunction('normalizeAvatar')}\n${extractFunction('normalizeUiState')}\nreturn { normalizeUiState }`)()
+  const old = helpers.normalizeUiState({ collapsed: true, filter: 'pdf', right: 20, top: 30 })
+  assert.equal(old.collapsed, true)
+  assert.equal(old.filter, 'pdf')
+  assert.equal(old.right, 20)
+  assert.equal(old.top, 30)
+  assert.equal(old.language, 'auto')
+  assert.deepEqual(old.avatar, { kind: 'default', value: '' })
+  assert.equal(helpers.normalizeUiState({ language: 'zh' }).language, 'zh')
+  assert.equal(helpers.normalizeUiState({ language: 'en' }).language, 'en')
+  assert.equal(helpers.normalizeUiState({ language: 'invalid', filter: 'invalid' }).language, 'auto')
+})
+
+test('character preferences accept local images and emoji but reject external URLs and SVG', () => {
+  const normalize = new Function(`${extractFunction('normalizeAvatar')}\nreturn normalizeAvatar`)()
+  assert.deepEqual(normalize({ kind: 'emoji', value: '🐱' }), { kind: 'emoji', value: '🐱' })
+  assert.equal(normalize({ kind: 'emoji', value: '  ' }).kind, 'default')
+  assert.equal(normalize({ kind: 'image', value: 'data:image/png;base64,YQ==' }).kind, 'image')
+  for (const value of ['https://example.com/image.png', 'data:image/svg+xml;base64,YQ==', 'javascript:alert(1)']) {
+    assert.equal(normalize({ kind: 'image', value }).kind, 'default')
+  }
+  assert.equal(normalize({ kind: 'image', value: 'data:image/png;base64,' + 'a'.repeat(2800000) }).kind, 'default')
+})
+
+test('outside clicks exclude owned controls, previews, shadow paths and missing refs', () => {
+  const outside = new Function(`${extractFunction('outsidePanel')}\nreturn outsidePanel`)()
+  const inside = {}
+  const external = {}
+  const root = { contains: (target) => target === inside }
+  assert.equal(outside({ target: inside }, root), false)
+  assert.equal(outside({ target: external }, root), true)
+  assert.equal(outside({ target: external, composedPath: () => [external, root] }, root), false)
+  assert.equal(outside({ target: external }, null), false)
+  assert.equal(outside({}, root), false)
+})
+
+test('explicit language selection wins over the host locale dictionary', () => {
+  const dictionary = source.slice(source.indexOf('    const DICTIONARY = {'), source.indexOf('    // Runtime services and locale plumbing'))
+  const create = new Function('mode', `${dictionary}\nconst NAME_SPACE = 'recent-deliverables'; let languageOverride = mode; let activeLanguage = mode === 'auto' ? 'zh' : mode; const localeService = { bind: () => () => 'host Chinese' };\n${extractFunction('t')}\nreturn t`)
+  assert.equal(create('en')('title'), 'Deliverables')
+  assert.equal(create('zh')('title'), '成品')
+  assert.equal(create('auto')('title'), 'host Chinese')
+  assert.equal(create('en')('footer.count', { n: 12 }), '12 files')
+})
+
+test('image selection rejects oversized and unsupported files before reading them', async () => {
+  const image = new Function(`${extractConst('AVATAR_IMAGE_TYPES')}\n${extractConst('AVATAR_MAX_BYTES')}\n${extractFunction('normalizeAvatar')}\n${extractFunction('characterImage')}\nreturn characterImage`)()
+  await assert.rejects(image({ type: 'image/png', size: 2 * 1024 * 1024 + 1 }), /imageTooLarge/)
+  await assert.rejects(image({ type: 'image/svg+xml', size: 10 }), /imageInvalid/)
+  await assert.rejects(image(null), /imageInvalid/)
+})
+
+for (const { name, fn } of cases) {
+  try {
+    await fn()
+    passed += 1
+    console.log(`ok   ${name}`)
+  } catch (error) {
+    failed += 1
+    console.error(`FAIL ${name}\n     ${error instanceof Error ? error.message : error}`)
+  }
+}
 
 console.log(`\n${passed} passed, ${failed} failed`)
 if (failed > 0) process.exitCode = 1
