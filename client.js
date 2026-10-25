@@ -22,6 +22,8 @@ window.__ModuleLoader__.load({
     const FILE_URL = 'api/recent-deliverables.file'
     const OPEN_URL = 'api/recent-deliverables.open'
     const DELETE_URL = 'api/recent-deliverables.delete'
+    const BATCH_DELETE_URL = 'api/recent-deliverables.delete-batch'
+    const RENAME_URL = 'api/recent-deliverables.rename'
     const ROW_BATCH = 100
     /** Browser-local UI state (never synced). */
     const STORAGE_KEY = 'dsh.recent-deliverables.v1'
@@ -90,9 +92,29 @@ window.__ModuleLoader__.load({
 
     const DICTIONARY = {
       en: {
+        'select': 'Select files',
+        'select.cancel': 'Cancel selection',
+        'select.row': 'Select — {name}',
+        'select.count': '{n} selected',
+        'select.hint': 'Hold the bin and drag down to select files',
+        'select.all': 'Select all results',
+        'select.delete': 'Move {n} to trash',
+        'select.done': 'Moved {n} files to trash',
+        'select.partial': 'Moved {n}; {failed} could not be moved. Refresh and try again.',
+        'rename': 'Rename',
+        'rename.hint': 'Click the name to rename · Enter to save · Esc to cancel',
+        'rename.input': 'New filename — {name}',
+        'rename.done': 'Filename updated',
+        'rename.exists': 'That name already exists. Choose another name.',
+        'rename.invalid': 'Enter a valid filename with an extension, without path separators.',
+        'rename.failed': 'Could not rename: {message}',
+        'settings.time': 'File times',
+        'settings.timeShow': 'Show times',
+        'settings.timeHide': 'Hide times',
+        'settings.timeHint': 'Hide dates and timestamps for a cleaner list.',
         'delete': 'Move to trash',
         'delete.busy': 'Moving to trash…',
-        'delete.done': 'Moved to trash 🧺',
+        'delete.done': 'Moved to trash ♡',
         'delete.failed': 'Could not move to trash: {message}',
         'delete.changed': 'This file changed. Refresh and try again.',
         'delete.missing': 'This file is already gone.',
@@ -200,9 +222,29 @@ window.__ModuleLoader__.load({
         'platform.slack': 'Slack',
       },
       zh: {
+        'select': '多选',
+        'select.cancel': '取消选择',
+        'select.row': '选择 — {name}',
+        'select.count': '已选 {n} 个',
+        'select.hint': '按住小垃圾桶向下拖动，即可连续选择',
+        'select.all': '全选当前结果',
+        'select.delete': '将 {n} 个移到废纸篓',
+        'select.done': '已将 {n} 个文件收进废纸篓',
+        'select.partial': '已移走 {n} 个，另有 {failed} 个未成功，请刷新后重试。',
+        'rename': '重命名',
+        'rename.hint': '点文件名重命名 · Enter 保存 · Esc 取消',
+        'rename.input': '新文件名 — {name}',
+        'rename.done': '文件名已更新',
+        'rename.exists': '已有同名文件，请换一个名字。',
+        'rename.invalid': '请输入有效文件名，保留扩展名，不要包含路径分隔符。',
+        'rename.failed': '重命名失败：{message}',
+        'settings.time': '文件时间',
+        'settings.timeShow': '显示时间',
+        'settings.timeHide': '不显示时间',
+        'settings.timeHint': '隐藏日期、相对时间和更新时间，让列表更清爽。',
         'delete': '移到废纸篓',
         'delete.busy': '正在收进废纸篓…',
-        'delete.done': '已收进废纸篓 🧺',
+        'delete.done': '已收进废纸篓 ♡',
         'delete.failed': '移到废纸篓失败：{message}',
         'delete.changed': '文件已发生变化，请刷新后再试。',
         'delete.missing': '这个文件已经不在了。',
@@ -559,7 +601,8 @@ window.__ModuleLoader__.load({
       app: 'M12 3.5v10.5M8.2 7.3L12 3.5l3.8 3.8M5.5 13.5V19a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-5.5',
       folder: 'M3.5 7.2a1.7 1.7 0 0 1 1.7-1.7h3.4l1.9 1.9h7.1a1.7 1.7 0 0 1 1.7 1.7v8.2a1.7 1.7 0 0 1-1.7 1.7H5.2a1.7 1.7 0 0 1-1.7-1.7z',
       copy: 'M9 9.5h9.5V19H9zM15 6.5H5.5V16',
-      basketCute: 'M5 8.5h14l-1.5 11H6.5zM4 8.5h16M8 8.5l2-5M16 8.5l-2-5M9 13v.2M15 13v.2M10 16q2 2 4 0',
+      trashCute: 'M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13M10 10v6M14 10v6M10 17q2 2 4 0',
+      select: 'M4 5h5v5H4zM15 5h5M15 9h5M4 15h5v5H4zM15 15h5M15 19h5',
       stack: 'M4.5 8.5L12 4.6l7.5 3.9L12 12.4zM4.5 12.6L12 16.5l7.5-3.9M4.5 16.4L12 20.3l7.5-3.9',
     }
 
@@ -601,6 +644,8 @@ window.__ModuleLoader__.load({
       })
       const listeners = new Set()
       const removedTokens = new Map()
+      const pendingRenames = new Map()
+      let mutationVersion = 0
       let request = null
       let followUp = null
       let followUpCount = 0
@@ -647,6 +692,7 @@ window.__ModuleLoader__.load({
             : { status: 'loading', refreshing: false, error: null },
         )
         const controller = new AbortController()
+        const loadVersion = mutationVersion
         request = (async () => {
           try {
             const response = await fetch(LIST_URL, {
@@ -659,6 +705,10 @@ window.__ModuleLoader__.load({
             const incoming = Array.isArray(payload?.items) ? payload.items : []
             const items = incoming.filter((item) => !removedTokens.has(item.path) ||
               (typeof item.deleteToken === 'string' && item.deleteToken !== removedTokens.get(item.path)))
+            for (const [path, update] of pendingRenames) {
+              if (update.version <= loadVersion) { pendingRenames.delete(path); continue }
+              if (!items.some((item) => item.path === update.item.path) && removedTokens.get(update.item.path) !== update.item.deleteToken) items.push(update.item)
+            }
             const stats = payload?.stats ? { ...payload.stats, shown: items.length } : null
             publish({
               status: 'ready',
@@ -702,6 +752,12 @@ window.__ModuleLoader__.load({
           const items = snapshot.items.filter((item) => item.path !== path)
           publish({ items, stats: snapshot.stats ? { ...snapshot.stats, shown: items.length } : null })
         },
+        rename(path, token, item) {
+          pendingRenames.set(path, { version: ++mutationVersion, item })
+          removedTokens.set(path, token)
+          const items = snapshot.items.map((old) => old.path === path ? item : old)
+          publish({ items })
+        },
         dispose() {
           clearFollowUp()
         },
@@ -713,6 +769,12 @@ window.__ModuleLoader__.load({
     // -----------------------------------------------------------------------
     // UI state persistence
     // -----------------------------------------------------------------------
+
+    function selectionRange(paths, start, end, base) {
+      const next = new Set(base)
+      for (let index = Math.max(0, Math.min(start, end)); index <= Math.min(paths.length - 1, Math.max(start, end)); index += 1) next.add(paths[index])
+      return next
+    }
 
     function normalizeAvatar(value) {
       if (value?.kind === 'emoji' && typeof value.value === 'string' && value.value.trim()) {
@@ -734,6 +796,7 @@ window.__ModuleLoader__.load({
         filter: allowed ? filter : 'all',
         right: Number.isFinite(parsed.right) ? parsed.right : null,
         top: Number.isFinite(parsed.top) ? parsed.top : null,
+        showTime: parsed.showTime !== false,
         language: parsed.language === 'zh' || parsed.language === 'en' ? parsed.language : 'auto',
         avatar: normalizeAvatar(parsed.avatar),
       }
@@ -851,8 +914,8 @@ window.__ModuleLoader__.load({
 .rd-input{box-sizing:border-box;width:100%;height:28px;border-radius:8px;border:1px solid var(--rd-line);background:var(--rd-canvas);color:var(--rd-ink);font:inherit;font-size:11.5px;padding:0 8px 0 27px;outline:none;transition:border-color var(--rd-open) var(--rd-ease)}
 .rd-input::placeholder{color:var(--rd-ink-3)}
 .rd-input:focus{border-color:color-mix(in srgb,var(--rd-accent) 55%,var(--rd-line))}
-.rd-chips{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
-.rd-chips::-webkit-scrollbar{display:none}
+.rd-root .rd-chips{display:flex;gap:5px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none!important;scrollbar-gutter:auto!important;padding:2px 1px 3px;-ms-overflow-style:none}
+.rd-root .rd-chips::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
 .rd-chip{flex:none;height:22px;padding:0 9px;border-radius:999px;border:1px solid var(--rd-line);background:transparent;color:var(--rd-ink-2);font:inherit;font-size:10.5px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;transition:background var(--rd-open) var(--rd-ease),color var(--rd-open) var(--rd-ease),border-color var(--rd-open) var(--rd-ease)}
 .rd-chip:hover{background:var(--rd-hover);color:var(--rd-ink)}
 .rd-chip[aria-pressed="true"]{background:color-mix(in srgb,var(--rd-accent) 13%,transparent);border-color:color-mix(in srgb,var(--rd-accent) 38%,transparent);color:var(--rd-accent)}
@@ -864,7 +927,7 @@ window.__ModuleLoader__.load({
 .rd-day{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--rd-ink-3);padding:8px 12px 4px}
 .rd-row{position:relative;display:flex;align-items:center;gap:9px;padding:7px 10px 7px 12px;border-radius:9px;margin:0 4px;transition:background var(--rd-open) var(--rd-ease)}
 .rd-row:hover{background:var(--rd-hover)}
-.rd-main{flex:1;min-width:0;display:flex;align-items:center;gap:9px;cursor:pointer;background:none;border:none;padding:0;margin:0;font:inherit;color:inherit;text-align:left}
+.rd-main{flex:1;min-width:0;display:flex;align-items:center;gap:9px;background:none;border:none;padding:0;margin:0;font:inherit;color:inherit;text-align:left}
 .rd-main:focus-visible{outline:2px solid var(--rd-accent);outline-offset:2px;border-radius:8px}
 .rd-tile{flex:none;width:29px;height:29px;border-radius:8px;display:grid;place-items:center;font-family:var(--dsh-claude-font-code,ui-monospace,SFMono-Regular,Menlo,monospace);font-size:8.5px;font-weight:700;letter-spacing:.01em;color:var(--rd-hue,var(--rd-ink-2));background:color-mix(in srgb,var(--rd-hue,var(--rd-ink-3)) 14%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--rd-hue,var(--rd-ink-3)) 18%,transparent)}
 .rd-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
@@ -879,14 +942,30 @@ window.__ModuleLoader__.load({
 .rd-mini:hover{background:var(--rd-hover);color:var(--rd-ink)}
 .rd-mini:disabled{opacity:.4;cursor:default}
 .rd-mini:focus-visible{outline:2px solid var(--rd-accent);outline-offset:1px}
-.rd-delete{position:relative;flex:none;display:grid;place-items:center;width:27px;height:27px;margin-left:2px;border:1px solid color-mix(in srgb,#dc8e9b 30%,var(--rd-line));border-radius:10px;background:color-mix(in srgb,#dc8e9b 12%,var(--rd-surface));color:var(--rd-accent);cursor:pointer;transition:transform .18s ease,background .18s ease}
-.rd-delete::before,.rd-delete::after{content:'♡';position:absolute;top:-5px;font-size:8px;line-height:1;color:#d97e91;opacity:0;transition:opacity .18s ease}
-.rd-delete::before{left:-2px}
+.rd-delete{position:relative;flex:none;display:grid;place-items:center;width:27px;height:27px;margin-left:2px;border:1px solid color-mix(in srgb,#dc8e9b 30%,var(--rd-line));border-radius:10px;background:color-mix(in srgb,#dc8e9b 12%,var(--rd-surface));color:var(--rd-accent);cursor:pointer;touch-action:none;user-select:none;transition:transform .18s ease,background .18s ease}
+.rd-delete::after{content:'♡';position:absolute;top:-5px;font-size:8px;line-height:1;color:#d97e91;opacity:.8;transition:opacity .18s ease}
 .rd-delete::after{right:-2px}
 .rd-delete:hover{transform:translateY(-1px);background:color-mix(in srgb,#dc8e9b 24%,var(--rd-surface))}
-.rd-delete:hover::before,.rd-delete:hover::after{opacity:1}
+.rd-delete:hover::after{opacity:1}
 .rd-delete:focus-visible{outline:2px solid var(--rd-accent);outline-offset:2px}
 .rd-delete:disabled{opacity:.45;cursor:wait;transform:none}
+.rd-name-line{display:flex;align-items:center;min-width:0;gap:6px}
+.rd-name-button{display:block;min-width:0;max-width:100%;border:0;background:transparent;padding:0;cursor:text;text-align:left;font:inherit;transition:opacity .16s ease}
+.rd-name-button:hover,.rd-name-button:focus-visible{opacity:.62}
+.rd-name-button:focus-visible{outline:1px solid var(--rd-accent);outline-offset:2px;border-radius:3px}
+.rd-rename{box-sizing:border-box;width:100%;min-width:0;border:1px solid var(--rd-accent);border-radius:5px;background:var(--rd-canvas);color:var(--rd-ink);font:inherit;font-size:12px;padding:2px 4px;outline:none}
+.rd-details{display:block;width:100%;min-width:0;background:none;border:0;margin:0;padding:0;color:inherit;text-align:left;cursor:pointer;font:inherit}
+.rd-details:focus-visible,.rd-tile:focus-visible{outline:2px solid var(--rd-accent);outline-offset:2px;border-radius:5px}
+.rd-tile{border:0;padding:0;cursor:pointer}
+.rd-select-toggle{display:flex;justify-content:space-between;align-items:center;gap:6px}
+.rd-select-hint{font-size:9px;color:var(--rd-ink-3);min-width:0}
+.rd-select-bar{display:flex;align-items:center;gap:6px;padding:7px 12px;background:color-mix(in srgb,var(--rd-accent) 8%,var(--rd-surface));border-top:1px solid var(--rd-line);font-size:10px;flex-wrap:wrap}
+.rd-select-bar strong{flex:1;white-space:nowrap;color:var(--rd-accent)}
+.rd-select-bar .rd-btn{font-size:10px;padding:5px 8px}
+.rd-row[data-selected="true"]{background:color-mix(in srgb,var(--rd-accent) 13%,var(--rd-surface))}
+.rd-list[data-select-mode="true"] .rd-actions{display:none}
+.rd-check{width:13px;height:13px;margin:0;flex:none;accent-color:var(--rd-accent);cursor:pointer}
+.rd-list[data-sweeping="true"]{user-select:none;touch-action:none}
 .rd-more{display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px;color:var(--rd-ink-3);font-size:10px}
 @media (prefers-reduced-motion:reduce){.rd-delete:hover{transform:none}}
 .rd-empty{padding:26px 22px 30px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px}
@@ -974,6 +1053,14 @@ window.__ModuleLoader__.load({
       const [pending, setPending] = React.useState(null)
       const [deleting, setDeleting] = React.useState(null)
       const deletingRef = React.useRef(new Set())
+      const [selectionMode, setSelectionMode] = React.useState(false)
+      const [selected, setSelected] = React.useState(new Set())
+      const [batchBusy, setBatchBusy] = React.useState(false)
+      const sweepRef = React.useRef(null)
+      const sweepClick = React.useRef(false)
+      const listRef = React.useRef(null)
+      const [renaming, setRenaming] = React.useState(null)
+      const renameRef = React.useRef(null)
       const [rowLimit, setRowLimit] = React.useState(ROW_BATCH)
       const [forward, setForward] = React.useState(null)
       const [removing, setRemoving] = React.useState(null)
@@ -1037,7 +1124,7 @@ window.__ModuleLoader__.load({
       React.useEffect(() => {
         if (ui.collapsed) return undefined
         const onOutside = (event) => {
-          if (dragState.current !== null || !outsidePanel(event, rootRef.current)) return
+          if (dragState.current !== null || sweepRef.current !== null || !outsidePanel(event, rootRef.current)) return
           setUi((current) => ({ ...current, collapsed: true }))
           saveUiState({ collapsed: true })
           setSettingsOpen(false)
@@ -1110,6 +1197,7 @@ window.__ModuleLoader__.load({
         () => () => {
           if (toastTimer.current !== null) window.clearTimeout(toastTimer.current)
           if (removeTimer.current !== null) window.clearTimeout(removeTimer.current)
+          sweepRef.current?.cleanup()
         },
         [],
       )
@@ -1158,7 +1246,7 @@ window.__ModuleLoader__.load({
 
       /**
        * Drag the panel by its header (or by the collapsed pill). The DOM is
-       * updated directly while the pointer moves so the 40-row list never
+       * updated directly while the pointer moves so the file list never
        * re-renders mid-drag; the committed position lands on pointerup.
        */
       const onDragStart = (event) => {
@@ -1331,7 +1419,7 @@ window.__ModuleLoader__.load({
       const reveal = (item) => runPathAction(item, 'reveal')
 
       const deleteItem = async (item) => {
-        if (!item.deleteToken || deletingRef.current.has(item.path)) return
+        if (batchBusy || !item.deleteToken || deletingRef.current.has(item.path)) return
         deletingRef.current.add(item.path)
         setDeleting(item.path)
         try {
@@ -1359,6 +1447,154 @@ window.__ModuleLoader__.load({
           deletingRef.current.delete(item.path)
           setDeleting((current) => current === item.path ? null : current)
         }
+      }
+
+      const startRename = (item) => {
+        if (batchBusy || !item.deleteToken || deletingRef.current.has(item.path)) return
+        const edit = { item, name: item.name, busy: false }
+        renameRef.current = edit
+        setRenaming(edit)
+      }
+
+      const cancelRename = () => { renameRef.current = null; setRenaming(null) }
+
+      const commitRename = async () => {
+        const edit = renameRef.current
+        if (!edit || edit.busy) return
+        if (edit.name === edit.item.name) { cancelRename(); return }
+        if (!edit.name.trim()) { showToast(t('rename.invalid')); return }
+        edit.busy = true
+        setRenaming({ ...edit })
+        try {
+          const response = await fetch(RENAME_URL, { method: 'POST', credentials: 'same-origin',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ path: edit.item.path, token: edit.item.deleteToken, name: edit.name }) })
+          const body = await response.json()
+          if (!response.ok || !body.item) {
+            if (body.error === 'name-exists') showToast(t('rename.exists'))
+            else if (body.error === 'bad-name') showToast(t('rename.invalid'))
+            else if (response.status === 409 || response.status === 403) showToast(t('delete.changed'))
+            else showToast(t('rename.failed', { message: body.message || body.error || `HTTP ${response.status}` }))
+            edit.busy = false
+            if (renameRef.current === edit) setRenaming({ ...edit })
+            return
+          }
+          store.rename(edit.item.path, edit.item.deleteToken, body.item)
+          setSelected((current) => { const next = new Set(current); if (next.delete(edit.item.path)) next.add(body.item.path); return next })
+          if (preview?.path === edit.item.path) setPreview(body.item)
+          if (forward?.item?.path === edit.item.path) closeForward()
+          if (renameRef.current === edit) cancelRename()
+          showToast(t('rename.done'))
+          void store.load()
+        } catch (error) {
+          showToast(t('rename.failed', { message: error.message || String(error) }))
+          edit.busy = false
+          if (renameRef.current === edit) setRenaming({ ...edit })
+        }
+      }
+
+      const toggleSelection = (path) => setSelected((current) => {
+        const next = new Set(current)
+        if (!next.delete(path)) next.add(path)
+        return next
+      })
+      const cancelSelection = () => { setSelectionMode(false); setSelected(new Set()) }
+
+      const deleteSelected = async () => {
+        if (batchBusy) return
+        const files = store.get().items.filter((item) => selected.has(item.path) && item.deleteToken)
+        if (!files.length) return
+        setBatchBusy(true)
+        let removed = 0
+        const successes = new Set()
+        try {
+          for (let at = 0; at < files.length; at += 100) {
+            const batch = files.slice(at, at + 100)
+            const response = await fetch(BATCH_DELETE_URL, { method: 'POST', credentials: 'same-origin',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ files: batch.map((item) => ({ path: item.path, token: item.deleteToken })) }) })
+            const body = await response.json()
+            if (!response.ok || !Array.isArray(body.results)) throw new Error(body.message || body.error || `HTTP ${response.status}`)
+            const tokens = new Map(batch.map((item) => [item.path, item.deleteToken]))
+            for (const result of body.results) {
+              if (result.deleted && tokens.has(result.path)) {
+                successes.add(result.path)
+                store.remove(result.path, tokens.get(result.path))
+                removed += 1
+              }
+            }
+          }
+          if (removed === files.length) { cancelSelection(); showToast(t('select.done', { n: removed })) }
+          else showToast(t('select.partial', { n: removed, failed: files.length - removed }))
+        } catch (error) {
+          showToast(removed ? t('select.partial', { n: removed, failed: files.length - removed }) : t('delete.failed', { message: error.message || String(error) }))
+        } finally {
+          setSelected((current) => new Set([...current].filter((path) => !successes.has(path))))
+          if (successes.has(preview?.path)) setPreview(null)
+          if (successes.has(forward?.item?.path)) closeForward()
+          setBatchBusy(false)
+          void store.load()
+        }
+      }
+
+      const startSweep = (event, item, index) => {
+        if (event.button !== 0 || batchBusy || renaming?.busy) return
+        sweepClick.current = false
+        const pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, anchor: index,
+          paths: visible.map((entry) => entry.path), base: new Set(selected), moved: false, frame: null, cleanup: null }
+        const handle = event.currentTarget
+        const paint = (clientY) => {
+          const list = listRef.current
+          if (!list) return
+          const rect = list.getBoundingClientRect()
+          const hit = document.elementFromPoint(Math.min(rect.right - 12, Math.max(rect.left + 12, pointer.x)),
+            Math.min(rect.bottom - 8, Math.max(rect.top + 8, clientY)))
+          const row = hit?.closest?.('[data-rd-index]')
+          if (!row) return
+          const end = Number(row.dataset.rdIndex)
+          setSelected(selectionRange(pointer.paths, pointer.anchor, end, pointer.base))
+        }
+        const scroll = () => {
+          if (sweepRef.current !== pointer || !pointer.moved) return
+          const list = listRef.current
+          if (list) {
+            const rect = list.getBoundingClientRect()
+            const speed = pointer.y < rect.top + 34 ? -9 : pointer.y > rect.bottom - 34 ? 9 : 0
+            if (speed) { list.scrollTop += speed; paint(pointer.y) }
+          }
+          pointer.frame = window.requestAnimationFrame(scroll)
+        }
+        const move = (next) => {
+          if (next.pointerId !== pointer.id) return
+          pointer.x = next.clientX; pointer.y = next.clientY
+          if (!pointer.moved && Math.hypot(next.clientX - event.clientX, next.clientY - event.clientY) > 5) {
+            pointer.moved = true
+            setSelectionMode(true)
+            listRef.current?.setAttribute('data-sweeping', 'true')
+            pointer.frame = window.requestAnimationFrame(scroll)
+          }
+          if (pointer.moved) { next.preventDefault(); paint(next.clientY) }
+        }
+        const finish = (next) => {
+          if (next.pointerId !== pointer.id) return
+          if (pointer.moved) { sweepClick.current = true; next.preventDefault() }
+          pointer.cleanup()
+        }
+        pointer.cleanup = () => {
+          window.removeEventListener('pointermove', move)
+          window.removeEventListener('pointerup', finish)
+          window.removeEventListener('pointercancel', finish)
+          if (pointer.frame !== null) window.cancelAnimationFrame(pointer.frame)
+          listRef.current?.removeAttribute('data-sweeping')
+          if (sweepRef.current === pointer) sweepRef.current = null
+          try { handle.releasePointerCapture?.(pointer.id) } catch {}
+        }
+        sweepRef.current?.cleanup()
+        sweepRef.current = pointer
+        try { handle.setPointerCapture?.(pointer.id) } catch {}
+        window.addEventListener('pointermove', move, { passive: false })
+        window.addEventListener('pointerup', finish)
+        window.addEventListener('pointercancel', finish)
       }
 
       const openNewTab = (item) => {
@@ -1573,15 +1809,16 @@ window.__ModuleLoader__.load({
       // ---- expanded panel -------------------------------------------------
       const rows = []
       let lastDay = ''
-      for (const item of visible.slice(0, rowLimit)) {
+      for (let index = 0; index < Math.min(visible.length, rowLimit); index += 1) {
+        const item = visible[index]
         const day = dayKeyOf(item.mtime)
-        if (day !== lastDay) {
+        if (ui.showTime && day !== lastDay) {
           lastDay = day
           rows.push(
             h('div', { className: 'rd-day', key: `day-${day}` }, dayLabel(item.mtime, nowRef.current)),
           )
         }
-        rows.push(renderRow(item))
+        rows.push(renderRow(item, index))
       }
 
       return h(
@@ -1694,7 +1931,18 @@ window.__ModuleLoader__.load({
                   ),
                 ),
               ),
+              h('div', { className: 'rd-select-toggle' },
+                h('span', { className: 'rd-select-hint' }, t('select.hint')),
+                h('button', { type: 'button', className: 'rd-link', disabled: batchBusy,
+                  'aria-pressed': selectionMode, onClick: () => selectionMode ? cancelSelection() : setSelectionMode(true) }, t('select'))),
             ),
+            selectionMode ? h('div', { className: 'rd-select-bar', role: 'group', 'aria-label': t('select') },
+              h('strong', { role: 'status' }, t('select.count', { n: items.filter((item) => selected.has(item.path)).length })),
+              h('button', { type: 'button', className: 'rd-link', disabled: batchBusy,
+                onClick: () => setSelected(new Set(visible.map((item) => item.path))) }, t('select.all')),
+              h('button', { type: 'button', className: 'rd-link', disabled: batchBusy, onClick: cancelSelection }, t('select.cancel')),
+              h('button', { type: 'button', className: 'rd-btn', disabled: batchBusy || !items.some((item) => selected.has(item.path)),
+                onClick: deleteSelected }, batchBusy ? t('delete.busy') : t('select.delete', { n: items.filter((item) => selected.has(item.path)).length }))) : null,
             (snapshot.status === 'loading' || snapshot.status === 'idle') && items.length === 0
               ? h(
                   'div',
@@ -1735,7 +1983,7 @@ window.__ModuleLoader__.load({
                         items.length === 0 ? t('empty.hint') : '',
                       ),
                     )
-                  : h('div', { className: 'rd-list', role: 'list', tabIndex: 0,
+                  : h('div', { className: 'rd-list', role: 'list', tabIndex: 0, ref: listRef, 'data-select-mode': selectionMode,
                     onScroll: (event) => {
                       const node = event.currentTarget
                       if (node.scrollHeight - node.scrollTop - node.clientHeight < 160) {
@@ -1763,7 +2011,7 @@ window.__ModuleLoader__.load({
               h(
                 'span',
                 { className: 'rd-foot-text' },
-                snapshot.loadedAt > 0 ? t('footer.updated', { time: clockOf(snapshot.loadedAt) }) : '',
+                ui.showTime && snapshot.loadedAt > 0 ? t('footer.updated', { time: clockOf(snapshot.loadedAt) }) : '',
               ),
             ),
             forward !== null ? renderForwardSheet() : null,
@@ -1784,6 +2032,13 @@ window.__ModuleLoader__.load({
               [['auto', t('settings.auto')], ['zh', '中文'], ['en', 'English']].map(([value, label]) =>
                 h('button', { key: value, type: 'button', className: 'rd-settings-choice',
                   'aria-pressed': ui.language === value, onClick: () => changeLanguage(value) }, label)))),
+          h('div', { className: 'rd-settings-group' },
+            h('span', { className: 'rd-settings-label' }, t('settings.time')),
+            h('div', { className: 'rd-settings-languages', role: 'group', 'aria-label': t('settings.time') },
+              [true, false].map((value) => h('button', { type: 'button', key: String(value),
+                className: 'rd-settings-choice', 'aria-pressed': ui.showTime === value,
+                onClick: () => updatePreference({ showTime: value }) }, t(value ? 'settings.timeShow' : 'settings.timeHide')))),
+            h('p', { className: 'rd-settings-hint' }, t('settings.timeHint'))),
           h('div', { className: 'rd-settings-group' },
             h('span', { className: 'rd-settings-label' }, t('settings.character')),
             h('p', { className: 'rd-settings-hint' }, t('settings.characterHint')),
@@ -1810,9 +2065,9 @@ window.__ModuleLoader__.load({
           h('p', { className: 'rd-settings-hint' }, t('settings.outsideHint')))
       }
 
-      function renderRow(item) {
+      function renderRow(item, index) {
         const hue = KIND_COLOR[item.kind] || KIND_COLOR.other
-        const meta = [t(`kind.${item.kind}`), formatBytes(item.bytes), relativeTime(item.mtime, nowRef.current)].filter(
+        const meta = [t(`kind.${item.kind}`), formatBytes(item.bytes), ui.showTime ? relativeTime(item.mtime, nowRef.current) : ''].filter(
           (part) => typeof part === 'string' && part.length > 0,
         )
         if (item.origin === 'present' && typeof item.sessionTitle === 'string' && item.sessionTitle.length > 0) {
@@ -1823,43 +2078,32 @@ window.__ModuleLoader__.load({
         const action = pending !== null && pending.endsWith(`:${item.path}`) ? pending : null
         return h(
           'div',
-          { className: 'rd-row', role: 'listitem', key: item.path },
-          h(
-            'button',
-            {
-              className: 'rd-main',
-              type: 'button',
-              onClick: () => activate(item),
-              title: item.path,
-              'aria-label': `${item.name} — ${item.previewable === true ? t('preview') : t('open')}`,
-            },
-            h('span', { className: 'rd-tile', style: { '--rd-hue': hue }, 'aria-hidden': 'true' }, KIND_CODE[item.kind] || 'FILE'),
-            h(
-              'span',
-              { className: 'rd-text' },
-              h(
-                'span',
-                { className: 'rd-name' },
-                item.name,
-                item.origin === 'present' ? h('span', { className: 'rd-badge', style: { marginLeft: 6 } }, t('origin.present')) : null,
-              ),
-              h(
-                'span',
-                { className: 'rd-meta' },
-                meta.map((part, index) =>
-                  h(
-                    React.Fragment,
-                    { key: `${item.path}-m${index}` },
-                    index > 0 ? h('span', { className: 'rd-dot', 'aria-hidden': 'true' }) : null,
-                    h('span', null, part),
-                  ),
-                ),
-              ),
-              typeof item.description === 'string' && item.description.length > 0
-                ? h('span', { className: 'rd-desc' }, item.description)
-                : null,
-            ),
-          ),
+          { className: 'rd-row', role: 'listitem', key: item.path, 'data-rd-index': index, 'data-selected': selected.has(item.path) },
+          selectionMode ? h('input', { type: 'checkbox', className: 'rd-check',
+            'aria-label': t('select.row', { name: item.name }), checked: selected.has(item.path), disabled: batchBusy,
+            onChange: () => toggleSelection(item.path) }) : null,
+          h('div', { className: 'rd-main' },
+            h('button', { type: 'button', className: 'rd-tile', style: { '--rd-hue': hue },
+              title: t('preview'), 'aria-label': `${t('preview')} — ${item.name}`, onClick: () => activate(item) }, KIND_CODE[item.kind] || 'FILE'),
+            h('div', { className: 'rd-text' },
+              h('div', { className: 'rd-name-line' },
+                renaming?.item.path === item.path ? h('input', { type: 'text', className: 'rd-rename',
+                  'aria-label': t('rename.input', { name: item.name }), value: renaming.name, disabled: renaming.busy,
+                  ref: (node) => { if (node && document.activeElement !== node && !renaming.busy) { node.focus(); node.setSelectionRange(0, Math.max(1, node.value.lastIndexOf('.'))) } },
+                  onChange: (event) => { const next = { ...renameRef.current, name: event.target.value }; renameRef.current = next; setRenaming(next) },
+                  onBlur: () => void commitRename(),
+                  onKeyDown: (event) => {
+                    if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); void commitRename() }
+                    else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); cancelRename() }
+                  } }) : h('button', { type: 'button', className: 'rd-name rd-name-button',
+                    title: `${item.path} · ${t('rename.hint')}`, 'aria-label': `${t('rename')} — ${item.name}`,
+                    disabled: batchBusy, onClick: () => startRename(item) }, item.name),
+                item.origin === 'present' ? h('span', { className: 'rd-badge' }, t('origin.present')) : null),
+              h('button', { type: 'button', className: 'rd-details', onClick: () => activate(item),
+                title: item.path, 'aria-label': `${item.name} — ${item.previewable === true ? t('preview') : t('open')}` },
+                h('span', { className: 'rd-meta' }, meta.map((part, partIndex) => h(React.Fragment, { key: partIndex },
+                  partIndex > 0 ? h('span', { className: 'rd-dot', 'aria-hidden': 'true' }) : null, h('span', null, part)))),
+                item.description ? h('span', { className: 'rd-desc' }, item.description) : null))),
           h(
             'span',
             { className: 'rd-actions' },
@@ -1902,11 +2146,16 @@ window.__ModuleLoader__.load({
           h('button', {
             type: 'button', className: 'rd-delete',
             title: `${t(deleting === item.path ? 'delete.busy' : 'delete')} — ${item.name}`,
-            'aria-label': `${t('delete')} — ${item.name}`,
-            disabled: !item.deleteToken || deletingRef.current.has(item.path),
-            onClick: (event) => { event.stopPropagation(); void deleteItem(item) },
+            'aria-label': selectionMode ? t('select.row', { name: item.name }) : `${t('delete')} — ${item.name}`,
+            'aria-pressed': selectionMode ? selected.has(item.path) : undefined,
+            disabled: batchBusy || renaming?.item.path === item.path || !item.deleteToken || deletingRef.current.has(item.path),
+            onPointerDown: (event) => startSweep(event, item, index),
+            onClick: (event) => { event.stopPropagation();
+              if (event.detail > 0 && sweepClick.current) { sweepClick.current = false; return }
+              if (selectionMode) toggleSelection(item.path)
+              else void deleteItem(item) },
           }, deleting === item.path ? h('span', { className: 'rd-spinner sm', 'aria-hidden': 'true' }) :
-            h(Icon, { name: 'basketCute', size: 17 })),
+            h(Icon, { name: 'trashCute', size: 17 })),
         )
       }
 
@@ -1927,8 +2176,8 @@ window.__ModuleLoader__.load({
           const meta = [
             t(`platform.${target.platform}`),
             t(`kind.${target.kind}`),
-            relativeTime(target.updatedAt, nowRef.current),
-          ]
+            ui.showTime ? relativeTime(target.updatedAt, nowRef.current) : '',
+          ].filter(Boolean)
           if (target.accountState === 'missing') meta.push(t('forward.missingTag'))
           else if (target.accountState === 'offline') meta.push(t('forward.offlineTag'))
           rows.push(
@@ -2036,7 +2285,7 @@ window.__ModuleLoader__.load({
         const closeButtonRef = (node) => {
           closeRef.current = node
         }
-        const meta = [t(`kind.${item.kind}`), formatBytes(item.bytes), relativeTime(item.mtime, nowRef.current)]
+        const meta = [t(`kind.${item.kind}`), formatBytes(item.bytes), ui.showTime ? relativeTime(item.mtime, nowRef.current) : ''].filter(Boolean)
           .filter((part) => typeof part === 'string' && part.length > 0)
           .join(' · ')
         let body

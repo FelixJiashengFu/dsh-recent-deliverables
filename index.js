@@ -1,13 +1,15 @@
 /**
  * Recent Deliverables — Host half.
  *
- * Owns four authenticated Fetch routes inside Connection's authentication
+ * Owns six authenticated Fetch routes inside Connection's authentication
  * fence:
  *
  *   GET  /api/recent-deliverables.list   the merged, newest-first deliverable list
  *   GET  /api/recent-deliverables.file   one listed file's bytes (inline preview)
  *   POST /api/recent-deliverables.open   open / reveal one listed path on the desktop
  *   POST /api/recent-deliverables.delete move one unchanged displayed file to OS trash
+ *   POST /api/recent-deliverables.delete-batch move a validated selection to OS trash
+ *   POST /api/recent-deliverables.rename rename without replacing an existing entry
  *
  * The list has two sources:
  *
@@ -29,7 +31,9 @@ import { createReadStream } from 'node:fs'
 import { readdir, realpath, stat, lstat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import trash from 'trash'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
+import { homedir } from 'node:os'
+import { validFileName, entryKey, prepareRename, loadAliases, saveAliases, followAlias } from './file-operations.js'
 import { Readable } from 'node:stream'
 import {
   basenameOf,
@@ -49,13 +53,15 @@ import {
 /** Stable Loader identity. */
 export const name = 'recent-deliverables'
 
-/** Connection supplies the authenticated Fetch registry used by all three routes. */
+/** Connection supplies the authenticated Fetch registry used by the routes. */
 export const inject = ['connection']
 
 const LIST_PATH = '/api/recent-deliverables.list'
 const FILE_PATH = '/api/recent-deliverables.file'
 const OPEN_PATH = '/api/recent-deliverables.open'
 const DELETE_PATH = '/api/recent-deliverables.delete'
+const BATCH_DELETE_PATH = '/api/recent-deliverables.delete-batch'
+const RENAME_PATH = '/api/recent-deliverables.rename'
 
 /** How many Session titles are memoized before the oldest entry is dropped. */
 const TITLE_CACHE_LIMIT = 512
@@ -75,13 +81,13 @@ const MIN_ROOT_BUDGET = 200
  * @param ctx - Host context carrying the connection Fetch registry.
  * @param config - optional Loader row config (see README.md).
  */
-export function createPlugin(trashFile = trash) {
-  return (ctx, config) => mount(ctx, config, trashFile)
+export function createPlugin(trashFile = trash, operations = {}) {
+  return (ctx, config) => mount(ctx, config, trashFile, operations)
 }
 
 export const apply = createPlugin()
 
-function mount(ctx, config, trashFile) {
+function mount(ctx, config, trashFile, operations) {
   const options = normalizeConfig(config)
   const lifetime = new AbortController()
   const state = {
@@ -105,7 +111,16 @@ function mount(ctx, config, trashFile) {
     deleteTickets: new Map(),
     deleting: new Set(),
     revision: 0,
+    aliases: new Map(),
+    aliasError: null,
+    aliasFile: operations.renameMapFile === false ? null : operations.renameMapFile ||
+      join(process.env.DSH_HOME || join(homedir(), '.dsh'), 'recent-deliverables', 'renames.json'),
+    renameQueue: Promise.resolve(),
+    pendingNames: new Set(),
   }
+
+  state.aliasesReady = loadAliases(state.aliasFile).then((aliases) => { state.aliases = aliases })
+    .catch((error) => { state.aliasError = error.message })
 
   ctx.effect(
     () => () => {
@@ -151,6 +166,15 @@ function mount(ctx, config, trashFile) {
     requestBody: 'buffered',
     fetch: serve((request) => deleteResponse(state, request, trashFile)),
   })
+  ctx.connection.fetch.register({
+    path: BATCH_DELETE_PATH, methods: ['POST'], requestBody: 'buffered',
+    fetch: serve((request) => batchDeleteResponse(state, request, trashFile)),
+  })
+  ctx.connection.fetch.register({
+    path: RENAME_PATH, methods: ['POST'], requestBody: 'buffered',
+    fetch: serve((request) => renameResponse(state, request)),
+  })
+
 
 }
 
@@ -201,6 +225,7 @@ async function listResponse(ctx, state, request) {
  *   half is still folding must not be, so the follow-up request sees the fold).
  */
 async function buildList(ctx, state) {
+  await state.aliasesReady
   const started = Date.now()
   const revision = state.revision
   const options = state.options
@@ -212,8 +237,17 @@ async function buildList(ctx, state) {
   // the scan below is awaited first so a fold that lands during it is included.
   const fold = options.includePresent ? ensurePresentFold(ctx, state, summaries) : undefined
   const files = options.includeFiles ? await scanRoots(state, roots) : []
-  const declared = state.present.items
-  const candidates = mergeDeliverables(declared, files, 0, options.declaredSlots).items
+  const declared = await Promise.all(state.present.items.map(async (item) => {
+    const original = item.originalPath || item.path
+    let path = followAlias(state.aliases, original)
+    if (path !== original && await fileInfo(path) === null) path = original
+    return path === item.path ? item : { ...item, path, name: basenameOf(path), kind: kindOfPath(path, options.extensions) ?? 'other' }
+  }))
+  // Explicitly renamed files stay listed even when their new name has no recognized extension.
+  const renamed = [...new Set([...state.aliases.values()].map((path) => followAlias(state.aliases, path)))].map((path) => ({
+    path, name: basenameOf(path), kind: kindOfPath(path, options.extensions) ?? 'other', origin: 'file', mtime: 0,
+  }))
+  const candidates = mergeDeliverables(declared, [...renamed, ...files], 0, options.declaredSlots).items.filter((item) => !state.pendingNames.has(item.path))
   const canonicalRoots = (await Promise.all(roots.map(async (root) => {
     try { return await realpath(root.path) } catch { return undefined }
   }))).filter(Boolean)
@@ -446,12 +480,15 @@ async function presentOfSession(state, query, summary) {
         if (file === null || typeof file !== 'object') continue
         const declared = typeof file.path === 'string' ? file.path.trim() : ''
         if (declared.length === 0) continue
-        const path = toAbsolutePath(declared, cwd)
-        if (!isAbsolutePath(path)) continue
-        const info = await fileInfo(path)
+        const originalPath = toAbsolutePath(declared, cwd)
+        if (!isAbsolutePath(originalPath)) continue
+        let path = followAlias(state.aliases, originalPath)
+        let info = await fileInfo(path)
+        if (info === null && path !== originalPath) { path = originalPath; info = await fileInfo(path) }
         if (info === null) continue
         items.push({
           path,
+          originalPath,
           name: basenameOf(path),
           kind: kindOfPath(path, state.options.extensions) ?? 'other',
           bytes: info.size,
@@ -787,7 +824,7 @@ async function fileRecord(path) {
   const canonical = await realpath(path)
   const target = await stat(canonical)
   if (!target.isFile()) return undefined
-  return { canonical, identity: identityOf(link, target), bytes: target.size, mtime: Math.round(target.mtimeMs) }
+  return { canonical, entryIdentity: entryKey(link), identity: identityOf(link, target), bytes: target.size, mtime: Math.round(target.mtimeMs) }
 }
 
 /** Eight workers keep unbounded lists from opening thousands of files at once. */
@@ -806,7 +843,7 @@ async function collectLiveFiles(candidates, roots, previousTickets) {
         const token = previous?.canonical === record.canonical && previous.identity === record.identity
           ? previous.token : randomUUID()
         result[index] = { ...item, ...record, deleteToken: token,
-          ticket: { ...record, token } }
+          ticket: { ...record, token, item: publicItem({ ...item, ...record, deleteToken: token }) } }
       } catch { /* a missing or unreadable file is no longer a current deliverable */ }
     }
   }))
@@ -840,19 +877,151 @@ async function deleteResponse(state, request, trashFile) {
     }
     // Do not expand glob characters, follow the link, or fall back to hard deletion.
     await trashFile(path, { glob: false })
-    state.revision += 1
-    state.deleteTickets.delete(path)
-    state.servable.delete(ticket.canonical)
-    state.list = { at: 0, value: null }
-    state.files.at = 0
-    state.present.items = state.present.items.filter((item) => item.path !== path)
-    state.present.builtAt = 0
-    state.present.signature = ''
-    state.present.generation += 1
+    forgetRemoved(state, path, ticket.canonical)
+    invalidateFiles(state)
     return json({ deleted: true, path, recoverable: true })
   } catch (error) {
     return json({ error: 'trash-failed', message: error instanceof Error ? error.message : String(error) }, 502)
   } finally {
     state.deleting.delete(path)
+  }
+}
+
+
+function invalidateFiles(state) {
+  state.revision += 1
+  state.list = { at: 0, value: null }
+  state.files.at = 0
+  state.present.builtAt = 0
+  state.present.signature = ''
+  state.present.generation += 1
+}
+
+function forgetRemoved(state, path, canonical) {
+  state.deleteTickets.delete(path)
+  state.servable.delete(canonical)
+  state.present.items = state.present.items.filter((item) => item.path !== path)
+}
+
+async function jsonBody(request, maxLength = 262144) {
+  if (request.method !== 'POST') return { failure: json({ error: 'method-not-allowed' }, 405) }
+  if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json')) {
+    return { failure: json({ error: 'json-required' }, 415) }
+  }
+  try {
+    const text = await request.text()
+    if (text.length > maxLength) return { failure: json({ error: 'body-too-large' }, 413) }
+    return { body: JSON.parse(text) }
+  } catch { return { failure: json({ error: 'bad-json' }, 400) } }
+}
+
+async function batchDeleteResponse(state, request, trashFile) {
+  const { body, failure } = await jsonBody(request)
+  if (failure) return failure
+  if (!Array.isArray(body?.files) || body.files.length === 0 || body.files.length > 200) {
+    return json({ error: 'bad-batch' }, 400)
+  }
+  const results = [], ready = [], seen = new Set()
+  for (const file of body.files) {
+    const path = typeof file?.path === 'string' ? file.path : ''
+    if (seen.has(path)) continue
+    seen.add(path)
+    const ticket = state.deleteTickets.get(path)
+    if (!ticket || typeof file.token !== 'string' || file.token !== ticket.token) {
+      results.push({ path, deleted: false, status: 403, error: 'not-listed' }); continue
+    }
+    if (state.deleting.has(path)) { results.push({ path, deleted: false, status: 409, error: 'delete-busy' }); continue }
+    state.deleting.add(path)
+    try {
+      const current = await fileRecord(path)
+      if (!current || current.canonical !== ticket.canonical || current.identity !== ticket.identity) {
+        state.deleting.delete(path)
+        results.push({ path, deleted: false, status: 409, error: 'file-changed' }); continue
+      }
+      ready.push({ path, ticket })
+    } catch {
+      state.deleting.delete(path)
+      results.push({ path, deleted: false, status: 404, error: 'not-found' })
+    }
+  }
+  let trashError
+  try {
+    if (ready.length) await trashFile(ready.map((file) => file.path), { glob: false })
+  } catch (error) { trashError = error instanceof Error ? error.message : String(error) }
+  for (const { path, ticket } of ready) {
+    try {
+      let gone = false
+      try { await lstat(path) } catch (error) { if (error.code === 'ENOENT') gone = true; else throw error }
+      if (gone) {
+        forgetRemoved(state, path, ticket.canonical)
+        results.push({ path, deleted: true, status: 200, recoverable: true })
+      } else results.push({ path, deleted: false, status: 502, error: 'trash-failed', message: trashError || 'File remains at its original path' })
+    } catch (error) {
+      results.push({ path, deleted: false, status: 502, error: 'trash-failed', message: error.message })
+    } finally { state.deleting.delete(path) }
+  }
+  if (results.some((item) => item.deleted)) invalidateFiles(state)
+  return json({ results, deleted: results.filter((item) => item.deleted).length })
+}
+
+async function renameResponse(state, request) {
+  const { body, failure } = await jsonBody(request, 16384)
+  if (failure) return failure
+  const path = typeof body?.path === 'string' ? body.path : ''
+  const ticket = state.deleteTickets.get(path)
+  if (!ticket || typeof body.token !== 'string' || body.token !== ticket.token) return json({ error: 'not-listed' }, 403)
+  if (!validFileName(body.name)) return json({ error: 'bad-name' }, 400)
+  const target = join(dirname(path), body.name)
+  if (target === path) return json({ renamed: true, path, item: ticket.item })
+  if (state.deleting.has(path)) return json({ error: 'file-busy' }, 409)
+  state.deleting.add(path)
+  const previous = state.renameQueue
+  let release
+  state.renameQueue = new Promise((resolve) => { release = resolve })
+  await previous
+  let prepared
+  let aliasesSaved = false
+  let oldAliases
+  try {
+    await state.aliasesReady
+    oldAliases = state.aliases
+    if (state.aliasError) return json({ error: 'rename-storage', message: state.aliasError }, 503)
+    const current = await fileRecord(path)
+    if (!current || current.canonical !== ticket.canonical || current.identity !== ticket.identity) {
+      return json({ error: 'file-changed' }, 409)
+    }
+    state.pendingNames.add(target)
+    prepared = await prepareRename(path, target, ticket.entryIdentity)
+    const nextAliases = new Map(state.aliases)
+    for (const [source] of nextAliases) {
+      if (followAlias(state.aliases, source) === path) nextAliases.set(source, target)
+    }
+    nextAliases.delete(target)
+    nextAliases.set(path, target)
+    await saveAliases(state.aliasFile, nextAliases)
+    aliasesSaved = true
+    await prepared.commit()
+    prepared = null
+    state.aliases = nextAliases
+    forgetRemoved(state, path, ticket.canonical)
+    const record = await fileRecord(target)
+    const token = randomUUID()
+    const item = publicItem({ ...ticket.item, ...record, path: target, name: body.name,
+      kind: kindOfPath(target, state.options.extensions) ?? 'other', deleteToken: token })
+    state.deleteTickets.set(target, { ...record, token, item })
+    state.servable.add(record.canonical)
+    invalidateFiles(state)
+    return json({ renamed: true, oldPath: path, path: target, item })
+  } catch (error) {
+    if (prepared) {
+      await prepared.rollback().catch(() => {})
+      if (aliasesSaved) await saveAliases(state.aliasFile, oldAliases).catch(() => {})
+    }
+    const status = error.code === 'EEXIST' ? 409 : error.code === 'FILE_CHANGED' ? 409 : error.code === 'ENOENT' ? 404 : 502
+    return json({ error: error.code === 'EEXIST' ? 'name-exists' : error.code === 'FILE_CHANGED' ? 'file-changed' : 'rename-failed', message: error.message }, status)
+  } finally {
+    state.pendingNames.delete(target)
+    state.deleting.delete(path)
+    release()
   }
 }

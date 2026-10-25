@@ -275,6 +275,8 @@ test('old preferences migrate without losing the filter or drag anchor', () => {
   assert.equal(old.right, 20)
   assert.equal(old.top, 30)
   assert.equal(old.language, 'auto')
+  assert.equal(old.showTime, true)
+  assert.equal(helpers.normalizeUiState({ showTime: false }).showTime, false)
   assert.deepEqual(old.avatar, { kind: 'default', value: '' })
   assert.equal(helpers.normalizeUiState({ language: 'zh' }).language, 'zh')
   assert.equal(helpers.normalizeUiState({ language: 'en' }).language, 'en')
@@ -341,6 +343,34 @@ test('successful deletion updates counts immediately and ignores stale lists whi
   respond(Response.json({ items: [{ ...a, deleteToken: 'restored-ticket' }, b], stats: { shown: 2 } }))
   await pending
   assert.equal(store.get().items.length, 2)
+  store.dispose()
+})
+
+
+test('sweep selection covers forward and backward ranges while keeping earlier choices', () => {
+  const range = new Function(`${extractFunction('selectionRange')}\nreturn selectionRange`)()
+  const paths = ['a', 'b', 'c', 'd', 'e']
+  assert.deepEqual([...range(paths, 1, 3, new Set(['e']))], ['e', 'b', 'c', 'd'])
+  assert.deepEqual([...range(paths, 3, 1, new Set())], ['b', 'c', 'd'])
+  assert.deepEqual([...range(paths, 0, 99, new Set())], paths)
+})
+
+test('rename immediately replaces its item and suppresses an in-flight old path', async () => {
+  let respond
+  const create = new Function('fetch', 'window', `${extractConst('LIST_URL')}\n${extractFunction('createStore')}\nreturn createStore`)(() => new Promise((resolve) => { respond = resolve }), { setTimeout, clearTimeout })
+  const store = create(), before = { path: '/a.txt', deleteToken: 'a' }, after = { path: '/b.txt', deleteToken: 'b' }
+  let pending = store.load()
+  respond(Response.json({ items: [before], stats: { shown: 1 } })); await pending
+  pending = store.load()
+  store.rename(before.path, before.deleteToken, after)
+  assert.equal(store.get().items[0].path, '/b.txt')
+  respond(Response.json({ items: [before], stats: { shown: 1 } })); await pending
+  assert.equal(store.get().items.some((item) => item.path === before.path), false)
+  assert.equal(store.get().items[0].path, after.path)
+  assert.equal(store.get().stats.shown, 1)
+  pending = store.load()
+  respond(Response.json({ items: [after], stats: { shown: 1 } })); await pending
+  assert.equal(store.get().items[0].path, after.path)
   store.dispose()
 })
 

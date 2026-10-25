@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Recent Deliverables",
-    "description": "Floating Claude-style panel in the top-right corner that lists the files you produced most recently (PDF, HTML, Office, images, ...) so you can preview, open, or reveal them in one click."
+    "description": "A floating file panel with previews, inline renaming, drag-select batch trash, complete counts, progressive rows, Chinese/English, cartoon avatars and optional file times."
   }
 }

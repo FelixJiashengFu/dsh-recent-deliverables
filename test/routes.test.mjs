@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, writeFile, symlink, unlink, realpath, rm, rename, access, lstat } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, symlink, unlink, realpath, rm, rename, access, lstat, readFile, readlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { apply, createPlugin } from '../index.js'
 
-async function fixture(t, extra = {}, config = {}, trashFile) {
+async function fixture(t, extra = {}, config = {}, trashFile, operations = {}) {
   const base = await mkdtemp(join(tmpdir(), 'recent-deliverables-'))
   t.after(() => rm(base, { recursive: true, force: true }))
   const root = join(base, 'workspace')
@@ -22,7 +22,7 @@ async function fixture(t, extra = {}, config = {}, trashFile) {
     },
     ...extra,
   }
-  const mount = trashFile ? createPlugin(trashFile) : apply
+  const mount = createPlugin(trashFile, { renameMapFile: join(base, 'rename-history.json'), ...operations })
   mount({
     effect: (fn) => { const dispose = fn(); t.after(dispose) },
     get: (name) => services[name],
@@ -30,8 +30,8 @@ async function fixture(t, extra = {}, config = {}, trashFile) {
   }, { includePresent: Boolean(extra.sessionQuery), cacheMs: 0, ...config })
   const call = (action, path, body) => routes.get(`/api/recent-deliverables.${action}`)(
     new Request(`http://localhost/api/recent-deliverables.${action}?path=${encodeURIComponent(path ?? '')}`,
-      { method: ['open', 'delete'].includes(action) ? 'POST' : 'GET',
-        ...(action === 'delete' ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? { path }) } : {}) }),
+      { method: ['open', 'delete', 'delete-batch', 'rename'].includes(action) ? 'POST' : 'GET',
+        ...(['delete', 'delete-batch', 'rename'].includes(action) ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? { path }) } : {}) }),
   )
   return { base, root, call, opened, services }
 }
@@ -286,4 +286,155 @@ test('delete route requires POST and a small JSON body', async (t) => {
     [{ method: 'POST', headers: { 'content-type': 'application/json' }, body: '{' }, 400],
     [{ method: 'POST', headers: { 'content-type': 'application/json' }, body: ' '.repeat(17000) }, 413],
   ]) assert.equal((await route(new Request('http://localhost/api/recent-deliverables.delete', options))).status, expected)
+})
+
+
+test('batch trash validates each selection, deduplicates it, and reports partial success', async (t) => {
+  const f = await fixture(t, {}, {}, async (paths, options) => {
+    assert.equal(options.glob, false)
+    assert.equal(paths.length, 2)
+    await rename(paths[0], join(f.base, 'trashed.txt'))
+    throw new Error('Second file is busy')
+  })
+  await writeFile(join(f.root, 'keep.txt'), 'keep')
+  const list = await (await f.call('list')).json()
+  const files = list.items.map((item) => ({ path: item.path, token: item.deleteToken }))
+  const response = await f.call('delete-batch', '', { files: [...files, files[0], { path: join(f.base, 'outside.txt'), token: 'forged' }] })
+  assert.equal(response.status, 200)
+  const result = await response.json()
+  assert.equal(result.results.length, 3)
+  assert.equal(result.deleted, 1)
+  assert.equal(result.results.filter((item) => item.error === 'trash-failed').length, 1)
+  assert.equal(result.results.filter((item) => item.error === 'not-listed').length, 1)
+  assert.equal((await (await f.call('list')).json()).items.length, 1)
+  assert.equal(await readFile(join(f.base, 'outside.txt'), 'utf8'), 'outside')
+})
+
+test('batch trash refuses changed files, empty selections and oversized batches', async (t) => {
+  let calls = 0
+  const f = await fixture(t, {}, {}, async () => { calls++ })
+  const item = (await (await f.call('list')).json()).items[0]
+  await writeFile(item.path, 'changed content')
+  const result = await (await f.call('delete-batch', '', { files: [{ path: item.path, token: item.deleteToken }] })).json()
+  assert.equal(result.results[0].error, 'file-changed')
+  assert.equal(calls, 0)
+  for (const files of [[], Array(201).fill({})]) assert.equal((await f.call('delete-batch', '', { files })).status, 400)
+})
+
+test('rename changes the real filename and preserves content, count and a usable new ticket', async (t) => {
+  const f = await fixture(t, {}, {}, async (path) => rename(path, join(f.base, 'trashed-renamed.txt')))
+  const item = (await (await f.call('list')).json()).items[0]
+  const response = await f.call('rename', '', { path: item.path, token: item.deleteToken, name: '新报告.md' })
+  assert.equal(response.status, 200)
+  const renamed = (await response.json()).item
+  assert.equal(renamed.name, '新报告.md')
+  assert.equal(renamed.path, join(f.root, '新报告.md'))
+  assert.notEqual(renamed.deleteToken, item.deleteToken)
+  assert.equal(await readFile(renamed.path, 'utf8'), 'inside')
+  await assert.rejects(access(item.path))
+  assert.equal((await (await f.call('list')).json()).items.length, 1)
+  assert.equal((await f.call('delete', renamed.path, { path: renamed.path, token: renamed.deleteToken })).status, 200)
+})
+
+test('rename never overwrites an existing file or accepts separators and Windows reserved names', async (t) => {
+  const f = await fixture(t)
+  await writeFile(join(f.root, 'taken.txt'), 'precious')
+  const item = (await (await f.call('list')).json()).items.find((item) => item.name === 'inside.txt')
+  for (const name of ['../outside.txt', 'a/b.txt', 'a\\b.txt', '', 'CON.txt', 'report.txt.', 'report.txt ']) {
+    assert.equal((await f.call('rename', '', { path: item.path, token: item.deleteToken, name })).status, 400, name)
+  }
+  assert.equal((await f.call('rename', '', { path: item.path, token: item.deleteToken, name: 'taken.txt' })).status, 409)
+  assert.equal(await readFile(item.path, 'utf8'), 'inside')
+  assert.equal(await readFile(join(f.root, 'taken.txt'), 'utf8'), 'precious')
+})
+
+test('rename rejects forged and stale tickets, including a swapped symlink', async (t) => {
+  const f = await fixture(t)
+  const item = (await (await f.call('list')).json()).items[0]
+  assert.equal((await f.call('rename', '', { path: item.path, token: 'forged', name: 'x.txt' })).status, 403)
+  await writeFile(item.path, 'changed')
+  assert.equal((await f.call('rename', '', { path: item.path, token: item.deleteToken, name: 'x.txt' })).status, 409)
+  const link = join(f.root, 'link.txt')
+  await symlink(item.path, link, 'file')
+  const linkItem = (await (await f.call('list')).json()).items.find((item) => item.path === link)
+  await unlink(link)
+  await symlink(join(f.base, 'outside.txt'), link, 'file')
+  assert.equal((await f.call('rename', '', { path: link, token: linkItem.deleteToken, name: 'new-link.txt' })).status, 409)
+})
+
+test('renaming a symlink keeps its target and the link itself', async (t) => {
+  const f = await fixture(t)
+  const target = join(f.root, 'inside.txt'), link = join(f.root, 'link.txt')
+  await symlink(target, link, 'file')
+  const item = (await (await f.call('list')).json()).items.find((item) => item.path === link)
+  const response = await f.call('rename', '', { path: link, token: item.deleteToken, name: 'renamed-link.txt' })
+  assert.equal(response.status, 200)
+  const renamed = (await response.json()).item
+  assert.equal((await lstat(renamed.path)).isSymbolicLink(), true)
+  assert.equal(await readlink(renamed.path), await readlink(target).catch(() => target))
+  assert.equal(await readFile(target, 'utf8'), 'inside')
+})
+
+test('metadata write failure rolls back the destination without losing the original', async (t) => {
+  const f = await fixture(t)
+  const item = (await (await f.call('list')).json()).items[0]
+  await mkdir(join(f.base, 'rename-history.json'))
+  const response = await f.call('rename', '', { path: item.path, token: item.deleteToken, name: 'new.txt' })
+  assert.equal(response.status, 502)
+  assert.equal(await readFile(item.path, 'utf8'), 'inside')
+  await assert.rejects(access(join(f.root, 'new.txt')))
+})
+
+test('renames with no extension stay listed after refresh and reload', async (t) => {
+  const f = await fixture(t)
+  const item = (await (await f.call('list')).json()).items[0]
+  const response = await f.call('rename', '', { path: item.path, token: item.deleteToken, name: '无扩展名' })
+  assert.equal(response.status, 200)
+  const renamed = (await (await f.call('list')).json()).items
+  assert.equal(renamed.length, 1)
+  assert.equal(renamed[0].name, '无扩展名')
+})
+
+test('renamed declared files outside roots survive a new plugin instance', async (t) => {
+  let declared
+  const extra = {
+    sessionQuery: { listEvents: async () => [{ type: 'deliverables/presented', seq: 1 }],
+      readEvent: async () => ({ target: { time: Date.now(), data: { files: [{ path: declared }] } } }) },
+    sessionController: { list: async () => ({ items: [{ sessionId: 's1', updatedAt: Date.now() }] }) },
+  }
+  const f = await fixture(t, extra)
+  declared = join(f.base, 'outside.txt')
+  let item
+  for (let i = 0; i < 30 && !item; i++) {
+    item = (await (await f.call('list')).json()).items.find((row) => row.path === declared)
+    if (!item) await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+  const response = await f.call('rename', '', { path: declared, token: item.deleteToken, name: 'outside-new.txt' })
+  assert.equal(response.status, 200)
+  const target = (await response.json()).item.path
+  const routes = new Map()
+  createPlugin(undefined, { renameMapFile: join(f.base, 'rename-history.json') })({
+    effect: (fn) => { const dispose = fn(); t.after(dispose) }, get: (name) => f.services[name],
+    connection: { fetch: { register: (route) => routes.set(route.path, route.fetch) } },
+  }, { includeFiles: false, cacheMs: 0 })
+  let list
+  for (let i = 0; i < 30; i++) {
+    list = await (await routes.get('/api/recent-deliverables.list')(new Request('http://localhost'))).json()
+    if (list.items.some((row) => row.path === target)) break
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+  assert.equal(list.items.some((row) => row.path === target && row.origin === 'present'), true)
+})
+
+test('repeated renames can return to the original name without alias cycles', async (t) => {
+  const f = await fixture(t)
+  let item = (await (await f.call('list')).json()).items[0]
+  for (const name of ['second.txt', 'third.txt', 'inside.txt', 'final.txt']) {
+    const response = await f.call('rename', '', { path: item.path, token: item.deleteToken, name })
+    assert.equal(response.status, 200)
+    item = (await response.json()).item
+    const list = await (await f.call('list')).json()
+    assert.equal(list.items.length, 1)
+    assert.equal(list.items[0].name, name)
+  }
 })

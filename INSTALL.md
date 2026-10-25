@@ -1,88 +1,70 @@
-# 安装 · Install
+# 安装 · Install 1.4.0
 
-这是一套给 **DeepSeek Harness Desktop（Web 插件系统）** 用的本地插件：右上角「成品 / 最近成品」浮窗。
-已验证环境：**macOS + DSH Desktop 0.2.1-rc.2**。运行时零外部依赖（只用 Node 内置模块 + 浏览器自带的 React），不含原生模块。
+给 **DeepSeek Harness Desktop / Web 插件系统** 使用。支持 Windows 和 macOS；需要宿主 Node.js 18.17.0+。插件依赖 `trash` 调用系统废纸篓 / 回收站，安装时需要获取 npm 依赖。
 
-> ⚠️ 最重要的一条：插件是**链接**安装到下面这个目录的。装好后**不要移动、重命名或删除该目录**，否则插件失效（需要重新安装一次）。
+## 从发布包安装
 
-## 1. 解压到一个固定目录
+从 [GitHub Releases](https://github.com/FelixJiashengFu/dsh-recent-deliverables/releases/latest) 下载 `dsh-recent-deliverables-1.4.0.tgz`。若 npm 未同步最新版，直接使用这个包即可。
 
-不要放下载目录或临时目录。建议：
+**方式 A：DSH CLI 安装压缩包**
 
-- macOS / Linux：`~/Plugins/dsh-recent-deliverables`
-- Windows：`%USERPROFILE%\Plugins\dsh-recent-deliverables`
+将示例中的路径替换成自己下载的文件路径：
 
-```bash
-mkdir -p ~/Plugins
-unzip dsh-recent-deliverables-1.1.1.zip -d ~/Plugins
-```
-
-解压后应能看到 `~/Plugins/dsh-recent-deliverables/package.json`。
-
-## 2. 安装到 DSH
-
-**方式 A — 图形界面（推荐）**
-
-1. 打开 DSH 的 Web 界面 → 左下角 **设置** → **插件**。
-2. 点 **「添加插件」** → **「安装第三方插件」**（说明写着“支持 npm 包、Git 仓库和本地目录”）。
-3. 在输入框里填**解压后目录的绝对路径**，例如：
-   - macOS：`/Users/你的用户名/Plugins/dsh-recent-deliverables`
-   - Windows：`C:\Users\你的用户名\Plugins\dsh-recent-deliverables`
-4. 安装完成后**重启 DSH**。
-
-**方式 B — 让 DSH 里的 agent 装**
-
-把 zip 解压后，对 agent 说：
-
-> 把 `/绝对路径/dsh-recent-deliverables` 这个本地插件 bundle 安装到当前 profile，用 `plugin_manager install_bundle`，装完告诉我结果。
-
-**方式 C — 命令行（仅当你的环境里有 `dsh` 命令）**
+macOS / Linux：
 
 ```bash
-dsh plugin --profile desktop add /绝对路径/dsh-recent-deliverables
+dsh plugin --profile desktop add 'dsh-recent-deliverables@file:/绝对路径/dsh-recent-deliverables-1.4.0.tgz' --ignore-scripts --registry=https://registry.npmjs.org/
 ```
 
-`--profile` 换成你自己的 profile 名（桌面版通常是 `desktop`）；该命令会把后续参数转发给 profile 目录里的 pnpm，并同步 bundle 栈。
+Windows PowerShell：
 
-## 3. 验证
+```powershell
+dsh plugin --profile desktop add 'dsh-recent-deliverables@file:C:/Users/你的用户名/Downloads/dsh-recent-deliverables-1.4.0.tgz' --ignore-scripts --registry=https://registry.npmjs.org/
+```
 
-- 重启后：页面**右上角**出现「成品」浮窗，可拖动、可折叠成药丸。
-- **设置 → 插件** 里能看到 `dsh-recent-deliverables`（版本 1.1.1）。
-- 行尾三个按钮：纸飞机 = 转发到 IM 助理；应用图标 = 用系统应用打开；文件夹 = 在文件管理器中显示。
-- 「转发到 IM 助理」需要**另外安装** `@michengai/dsh-im-connect` 并至少绑定一个聊天；没装它不影响列表、预览、打开、拖动这些功能（转发会提示连不上）。
+桌面版的 CLI 可能需要使用应用内附带的 `dsh` 可执行文件。`--profile desktop` 换成当前使用的 profile。
 
-## 4. 卸载
+**方式 B：解压成本地目录，在图形界面添加**
 
-设置 → 插件 → 找到 `dsh-recent-deliverables` → 卸载，然后可以删除目录。
-（agent 侧也可以用 `plugin_manager` 的 `remove_bundle`。）
+1. 把 tgz 解压到一个固定目录；里面的 `package/` 文件夹包含 `package.json`，可以改名为 `dsh-recent-deliverables`。
+2. 在该文件夹打开终端 / PowerShell，先运行 `npm install --omit=dev --ignore-scripts`，安装依赖。
+3. DSH → 设置 → 插件 → 添加插件，在输入框中填这个**包含 package.json 的文件夹的绝对路径**。例如 macOS 的 `/Users/你的用户名/Plugins/dsh-recent-deliverables`，或 Windows 的 `C:\Users\你的用户名\Plugins\dsh-recent-deliverables`。
+4. 安装源可以保留 npm 官方源；它用于获取依赖，本地目录不用改成自定义源。
+5. **完全退出，再重新打开 DSH。**
 
-## 5. 自检（可选，需要 Node 22+）
-
-在解压目录里执行：
+本地目录方式会链接到源目录，安装后请保留该文件夹。若通过 CLI 链接目录，使用显式包名与 link 形式，避免已有依赖规格干扰：
 
 ```bash
-node test/logic.test.mjs    # 12 passed
-node test/client.test.mjs   # 7 passed
+dsh plugin --profile desktop add 'dsh-recent-deliverables@link:/绝对路径/dsh-recent-deliverables' --ignore-scripts --registry=https://registry.npmjs.org/
 ```
 
-## 兼容性
+## 验证升级
 
-| 项 | 说明 |
-| --- | --- |
-| 宿主 | DSH Desktop 0.2.1-rc.2（Web profile）。更老的版本可能缺 `connection.fetch` / `remote.session` 这些 API |
-| 平台 | macOS / Windows / Linux（无原生依赖、无 npm 依赖） |
-| 可选依赖 | `@michengai/dsh-im-connect`（仅“转发到 IM 助理”需要） |
+- 设置 → 插件中版本为 **1.4.0**，页面右上角出现成品浮窗。
+- 小垃圾桶只有右上角一颗爱心；按住向下拖后出现选中数量，点「移到废纸篓」执行批量整理。
+- 点文件名可以编辑，Enter 保存、Esc 取消；同名会提示，不覆盖文件。
+- 点左上角头像，在「外观与语言」中可以显示 / 隐藏时间；语言和头像可自定义。
+- Windows 的删除进入系统回收站，Mac 进入废纸篓。清空前可恢复，清空后才释放磁盘空间。
+- 「转发到 IM 助理」需要另装 `@michengai/dsh-im-connect` 并绑定聊天，其余功能独立使用。
 
----
+## 已发布到 npm 后
 
-## English summary
+在添加插件里输入 `dsh-recent-deliverables@1.4.0`，或运行：
 
-A local DSH Desktop plugin: a floating "recent deliverables" panel in the top-right corner.
-Tested on **macOS + DSH Desktop 0.2.1-rc.2**; no npm or native dependencies.
+```bash
+dsh plugin --profile desktop add dsh-recent-deliverables@1.4.0
+```
 
-1. Unzip into a **permanent** directory, e.g. `~/Plugins/dsh-recent-deliverables`.
-2. In DSH: **Settings → Plugins → Add plugin → Install third-party plugin**, enter the **absolute path** of that directory, then **restart DSH**.
-   (Or ask the agent: *install the local bundle at `/abs/path/dsh-recent-deliverables` via `plugin_manager install_bundle`*.)
-3. The panel appears in the top-right corner. Settings → Plugins should list `dsh-recent-deliverables` 1.1.1.
+npm 与 GitHub 发布状态可能不同。若提示没有这个版本，使用上面的 GitHub 发布包。
 
-The install links to that directory — **do not move or delete it afterwards**. The "Forward to IM Assistant" action additionally needs `@michengai/dsh-im-connect` with at least one bound chat; everything else works without it.
+## 卸载
+
+DSH 设置 → 插件 → `dsh-recent-deliverables` → 卸载；或 `dsh plugin --profile desktop remove dsh-recent-deliverables`。卸载插件不会删除成品文件。通过本地链接安装的，卸载后可移除插件源目录。
+
+## English
+
+Download `dsh-recent-deliverables-1.4.0.tgz` from [Releases](https://github.com/FelixJiashengFu/dsh-recent-deliverables/releases/latest). Install it with the DSH CLI using the explicit `dsh-recent-deliverables@file:/absolute/path/package.tgz` spec above.
+
+For a local directory install, extract the package into a permanent folder, run `npm install --omit=dev --ignore-scripts` there, then add that folder's absolute path in DSH Settings → Plugins. Keep the folder in place. Fully quit and reopen DSH after upgrading.
+
+Windows and macOS are supported; core CI tests run on both and Linux. Real DSH/browser UI testing was performed on macOS. The runtime uses the `trash` package's platform helpers and requires Node.js 18.17.0 or newer.

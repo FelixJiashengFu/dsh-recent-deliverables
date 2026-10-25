@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.0 — 2026-10-25
+
+- Replace the basket with a centered, symmetric little trash bin and keep only one heart at the upper right.
+- Add pointer drag selection from a trash icon, automatic edge scrolling, checkboxes, selection counts and select-all for filtered results. Batch trash runs in chunks, updates counts immediately, and reports per-file partial failures.
+- Add direct inline filename editing: translucent hover, Enter/blur to save, Escape to cancel. Perform an exclusive real-file rename without overwriting existing destinations, validate portable names, preserve symlinks, and roll back if rename metadata cannot be saved.
+- Persist local rename mappings so renamed declared files remain associated with their deliverable history after reload; keep renamed files without recognized extensions visible.
+- Add a persistent show/hide-times preference for date groups, relative file times and updated timestamps. Keep existing language, avatar and position preferences.
+- Hide the overlapping horizontal chip scrollbar with scoped styles while retaining horizontal scrolling and keyboard access.
+- Add four promotional images based on the actual UI, rewrite the README and cross-platform installation guide, and explain file organization, recoverable trash, first-batch rendering and on-demand previews without unmeasured RAM claims.
+- Expand CI to Windows, macOS and Linux; add batch, rename, rollback, alias, portable-name and stale-response regressions.
+
 ## 1.3.0 — 2026-10-25
 
 - Remove default file-count, scan-entry, session-count and session-age caps. Show the full current count; append long lists as users scroll, with no fixed display ceiling.

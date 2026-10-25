@@ -1,7 +1,7 @@
 {
   "name": "dsh-recent-deliverables",
-  "version": "1.3.0",
-  "description": "Claude-style floating panel that lists the files you produced most recently (PDF, HTML, Office, images, ...) and opens, previews, or reveals them.",
+  "version": "1.4.0",
+  "description": "A customizable floating file panel for DeepSeek Harness: preview, search, rename, drag-select and move deliverables to OS trash. Chinese/English, cartoon avatars, complete counts and progressive rendering.",
   "type": "module",
   "exports": {
     ".": "./index.js",
@@ -12,6 +12,7 @@
   "files": [
     "index.js",
     "logic.js",
+    "file-operations.js",
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",
@@ -50,7 +51,7 @@
     "url": "https://github.com/FelixJiashengFu/dsh-recent-deliverables/issues"
   },
   "scripts": {
-    "test": "node --test test/*.test.mjs",
+    "test": "node --test",
     "prepublishOnly": "npm test"
   },
   "engines": {

@@ -1,14 +1,106 @@
-# Recent Deliverables（最近成品）
+# Recent Deliverables · 最近成品
 
-一个给 DeepSeek Harness Web 界面用的持久插件，在**右上角**开一个 Claude 风格的浮窗，列出你最近做出来的文件（PDF、HTML、Office、图片、文本…），点一下就能内嵌预览、用系统应用打开、或定位到文件夹。
+**做出来的文件，都在手边。** 一个给 DeepSeek Harness 用的成品浮窗，集中查看 PDF、网页、Office、图片和文本，直接预览、改名、整理，或用系统应用打开。
 
-- 面板常驻右上角，可折叠成一枚小药丸（`成品 · 12`），状态记在浏览器本地。
-- 文件名、类型、大小、时间、来源工作区一目了然；按类型筛选、按天分组、可按文件名搜索。
-- 交付文件（agent 调用 `present` 声明过的）带「交付」徽章并显示当时的说明文案。
-- 预览是页面内的 80vw 大窗：PDF / HTML / 图片 / 文本直接看，Office 文件一键交给系统应用。
-- 浮窗可拖动：按住标题栏（折叠后按住药丸）拖到任意位置，位置记在浏览器本地；**双击标题栏复位**到右上角，窗口缩放/切换折叠时会自动收回可视范围。
-- 每行最左边的按钮是**「转发到 IM 助理」**：选一个已绑定的 IM 聊天，成品文件就会由 IM 助理发到那个聊天（微信 / 飞书 / Telegram / Discord …）。
-- 自动刷新：展开时 20 秒、折叠时 60 秒，窗口重新聚焦时也会刷新。
+![Recent Deliverables 1.4.0：完整计数、拖选整理、直接改名、时间开关和卡通胶囊](https://raw.githubusercontent.com/FelixJiashengFu/dsh-recent-deliverables/main/docs/images/hero.png)
+
+[下载最新版](https://github.com/FelixJiashengFu/dsh-recent-deliverables/releases/latest) · [安装说明](./INSTALL.md) · [更新记录](./CHANGELOG.md) · [English](#english)
+
+## 1.4.0：把文件整理得更顺手
+
+| 操作 | 结果 |
+| --- | --- |
+| 点一下小垃圾桶 | 把这一份文件移到系统废纸篓 / 回收站 |
+| 按住垃圾桶向下拖 | 连续选中多份文件，松手后统一移到废纸篓；边缘自动滚动 |
+| 点「多选」 | 用复选框选择文件，也可全选当前筛选结果，支持键盘操作 |
+| 轻触 / 悬停文件名，再点一下 | 文件名以半透明提示可编辑，直接输入新名字；Enter 保存、Esc 取消，失焦也会保存 |
+| 点左上角卡通图标 | 切换中文 / English、显示 / 隐藏时间，或选择自己的卡通形象 |
+| 点击浮窗外 | 自动收成小胶囊，原来的按钮或输入仍正常响应 |
+
+垃圾桶图案居中、左右对称，**只在右上角保留一颗爱心**。文件类型筛选条支持左右滚动，隐藏了会盖住按钮的滚动条。总数显示扫描范围内已收集到的真实文件数量，默认没有 40 或 200 条上限；后台收集交付记录时会显示整理提示。
+
+![按住垃圾桶拖选，再统一移到废纸篓](https://raw.githubusercontent.com/FelixJiashengFu/dsh-recent-deliverables/main/docs/images/organize.png)
+
+批量整理会显示选中数量；可取消选择，也可用「全选当前结果」处理搜索 / 筛选后的全部结果，包含还没渲染出来的行。移到废纸篓后计数立即更新；若一部分文件已改变或无法移动，会保留失败的选择并提示结果。只移动你选中的文件，不删除目录，不永久擦除；符号链接只移动链接本身，保留指向的文件。
+
+重命名会改动磁盘上的真实文件名，保留文件内容。遇到同名目标会提示，**不会覆盖已有文件**；拒绝路径分隔符和 Windows 保留名。重命名后的交付文件会继续对应到原交付记录，本机重命名映射保存在 DSH 数据目录的 `recent-deliverables/renames.json`，不修改会话日志。文件扩展名建议保留，以便系统继续识别文件类型。
+
+## 你的形象、语言与时间
+
+![直接编辑文件名、文件时间开关、中英切换与本机卡通形象](https://raw.githubusercontent.com/FelixJiashengFu/dsh-recent-deliverables/main/docs/images/personalize.png)
+
+- 标题栏的 **EN / 中** 一键切换界面语言；设置里可选 **跟随 DSH / 中文 / English**，只影响这个浮窗。
+- **显示时间 / 不显示时间** 控制日期分组、文件相对时间和更新时间。文件类型、大小和来源仍可见。
+- 选择内置卡通表情，输入自定义表情 / 文字，或选取本机 PNG、JPG、WebP、GIF 图片（最大 2 MB）。形象在浮窗和胶囊里保持一致。
+- 语言、时间、形象、筛选和位置保存在浏览器本机。图片不上传，可恢复原始图标。
+- 按标题栏或胶囊拖动位置，双击标题栏复位；窗口尺寸变化时会自动保持在可视范围内。自己的预览窗和设置不会触发外部点击收起。
+
+## 文件管理与渲染负担，分别做好
+
+![首屏分批渲染、按需预览、不同刷新频率与磁盘空间说明](https://raw.githubusercontent.com/FelixJiashengFu/dsh-recent-deliverables/main/docs/images/lighter.png)
+
+**整理文件与磁盘空间：** 搜索、类型筛选、直接改名和批量移到废纸篓，让工作区更好整理。移走文件后可从系统废纸篓 / 回收站恢复；**只有清空系统废纸篓 / 回收站后，才会释放相应磁盘空间**。插件不提供自动清空功能。
+
+**减少一次性的界面渲染负担：** 首批最多渲染 100 个文件行，滚动时每次继续追加 100 行，也可点「继续显示」。文件总量完整统计；列表主要传输元数据，点开预览时才读取该文件内容。展开时约每 20 秒刷新，收成胶囊后约每 60 秒，页面重新聚焦也会刷新。
+
+分批渲染减少首次创建的 DOM 行，持续滚动后已加载的行仍会保留；它不保证固定的 RAM 用量。完整列表元数据和扫描缓存仍占用内存，目前没有跨平台内存用量基准测试，因此不宣称某个具体的内存节省百分比。
+
+## 安装与平台
+
+支持 **Windows 与 macOS** 的 DSH Web 插件系统；Windows 使用系统回收站，macOS 使用系统废纸篓。自动化测试覆盖 Windows、macOS、Linux；真实 DSH / 浏览器交互在 Mac 上验证，Windows 桌面界面仍需实机验证。
+
+从 [GitHub Releases](https://github.com/FelixJiashengFu/dsh-recent-deliverables/releases/latest) 下载 `dsh-recent-deliverables-1.4.0.tgz`，通过 DSH CLI 安装，或解压成固定本地目录后在图形界面添加。两种方法见 [INSTALL.md](./INSTALL.md)。若 npm 尚未同步最新版，请优先使用 Releases 包；包名为 `dsh-recent-deliverables`。
+
+升级后请**完全退出并重新打开 DSH**，让宿主路由与前端同时更新。
+
+## 数据与计数范围
+
+列表合并两个来源，按绝对路径去重，按修改时间从新到旧排列：
+
+1. **声明过的成品**：读取内置 `present` 工具写入的 `deliverables/presented` 事件，附带说明和来源会话。后台整理，不阻塞首次文件扫描。
+2. **工作目录中的文件**：扫描已注册工作区、默认目录、可见会话目录和 `extraRoots`。默认扫描深度 5，跳过依赖、构建、隐藏目录和系统垃圾文件。
+
+“没有条数上限”指扫描范围内的结果数量；计数仍受根目录、深度、扩展名和访问权限影响。默认不限制扫描条目、会话数量或会话年龄。可用「交付」筛选只查看 agent 显式交付的成品。若主动设置 `maxItems`，`declaredSlots` 为交付文件保留位置，其余名额按修改时间填满。
+
+## 配置
+
+在 profile 的 `cordis.patch.yml` 里改这个 bundle 的行即可（省略即用默认值）：
+
+| 键 | 默认 | 说明 |
+| --- | --- | --- |
+| `maxItems` | `0` | 0 表示不限条数；正数可主动限制显示总量 |
+| `declaredSlots` | `12` | 给「交付」文件保留的席位（0–200） |
+| `maxSessions` | `0` | 0 表示所有可见会话；正数限制最近会话数量。关闭交付来源请用 `includePresent: false` |
+| `maxSessionAgeDays` | `0` | 只看最近多少天内活跃过的 Session（0 表示不限制） |
+| `scanDepth` | `5` | 目录扫描深度（0–20） |
+| `maxScanFiles` | `0` | 0 表示不限扫描条目；正数可主动限制扫描预算 |
+| `cacheMs` | `15000` | 磁盘扫描结果的缓存时间 |
+| `includePresent` | `true` | 是否包含交付记录 |
+| `includeFiles` | `true` | 是否包含文件扫描 |
+| `extraRoots` | `[]` | 额外要扫描的绝对路径 |
+| `ignoreRoots` | `[]` | 不扫描的绝对路径（其子目录也跳过） |
+| `extensions` | 内置清单 | 覆盖文件扫描的扩展名清单，例如 `[pdf, html, docx]` |
+
+
+## HTTP 接口与文件边界
+
+六个路由均注册在宿主 Connection 的鉴权围栏内：
+
+| 路由 | 用途 |
+| --- | --- |
+| `GET /api/recent-deliverables.list` | 列表、统计、能力及每份文件的操作令牌 |
+| `GET /api/recent-deliverables.file?path=…` | 允许访问的文件内容 |
+| `POST /api/recent-deliverables.open?path=…[&action=reveal]` | 系统打开或定位 |
+| `POST /api/recent-deliverables.delete` | JSON `{path, token}`，移动一份未变化的文件 |
+| `POST /api/recent-deliverables.delete-batch` | JSON `{files: [{path, token}]}`，每个请求最多 200 项，逐项返回结果；客户端自动分批 |
+| `POST /api/recent-deliverables.rename` | JSON `{path, token, name}`，同目录中重命名，不覆盖目标 |
+
+读取和打开前解析真实路径、检查目录边界；`..` 和符号链接不能绕过工作区限制。显式交付并列出的工作区外文件仍可使用。删除和改名核对列表令牌与文件身份，拒绝已更换的文件或链接；并发重复操作不会重复移动。HTML / SVG 预览处于沙盒中，不得访问宿主页面。
+
+扫描不改动文件；只有用户明确执行删除或重命名时才移动选中文件。会话日志不被修改，移到废纸篓失败时不会降级成永久删除。
+
+<details>
+<summary>转发到 IM 助理、账号与聊天管理</summary>
 
 ## 转发到 IM 助理
 
@@ -38,91 +130,36 @@ IM 助理（`@michengai/dsh-im-connect`）在 1.0.12 里撤掉了主动投递的
   - `凭据不足，无法启动渠道` → 该账号没有有效凭据，重新添加或补配置；
   - `no adapter registered for provider "xxx"` → 账号详情里的助手模型指向了宿主没有的供应商，换一个可用模型。
 
-## 数据从哪里来
 
-列表合并两个来源，按绝对路径去重，按修改时间从新到旧排列：
+</details>
 
-1. **声明过的成品**：读取 Session 日志里 `deliverables/presented` 事件（就是内置 `present` 工具写下的那条），带说明文案和来源会话标题。为了不阻塞首次打开，这部分在后台折叠；首屏先给文件扫描结果，折好后前端会自动补上。
-2. **最近产出的文件**：对已知工作目录按配置深度做只读的广度优先扫描——已注册的 workspace、默认目录、全部可见 Session 的 cwd、以及 `extraRoots`。会跳过 `node_modules`、`.git`、`dist`、`build` 等依赖/构建目录，以及 `.DS_Store`、`._*` 这类系统垃圾文件。
+## 开发与验证
 
-为了不被「一次性生成的一堆中间图」挤出面板，**声明过的成品保留固定席位**（默认 12 个），其余名额由所有剩余条目按时间填满（包括更多已声明成品），最后再按时间排序；保留席位不是交付文件的显示上限。
+Node.js **18.17.0+**，运行时使用 `trash` 依赖处理平台废纸篓 / 回收站。前端复用宿主 React，无需前端构建。
 
-## 完整计数与一键删除（1.3.0）
-
-- 默认不限制文件条数、扫描条目数量、会话数量或会话年龄。数字显示扫描范围内已收集到的实际文件总数，包含超过 40 或 200 条的结果；后台仍在收集时会显示整理提示。
-- 长列表先渲染 100 行，滚动到底部自动追加；也可以使用「继续显示」，直到全部文件都能查看。这是滚动加载，不会截断总量。
-- 每行右侧常驻一个左右对称的可爱收纳篮。点击一次，将该文件移到系统废纸篓，行和计数立即更新；从系统废纸篓恢复后，刷新会重新显示。
-- 删除只接受当前列表内的文件。若文件已改变，先刷新；不会删除目录，也不会永久擦除。删除符号链接只移走链接，保留指向的原文件。
-
-## 自动收起、语言和卡通形象（1.2.0）
-
-- 展开后点击浮窗外，会自动收成胶囊，外部按钮、输入和链接仍正常响应。外部 iframe 也会触发收起；插件自己的预览和设置不会误收起。
-- 标题栏的 **EN / 中** 可一键切换界面语言；头像设置里还能选择 **跟随 DSH / 中文 / English**。此选择只影响成品浮窗。
-- 点击标题最左侧的图标，打开 **外观与语言**。可选内置卡通表情、输入自己的表情或文字，或选取本机卡通图片；展开和胶囊状态使用同一形象。
-- 图片支持 PNG、JPG、WebP、GIF，最大 2 MB。语言与形象保存在浏览器本机，不上传图片；刷新后仍保留。可随时恢复原始图标。
-
-## 配置
-
-在 profile 的 `cordis.patch.yml` 里改这个 bundle 的行即可（省略即用默认值）：
-
-| 键 | 默认 | 说明 |
-| --- | --- | --- |
-| `maxItems` | `0` | 0 表示不限条数；正数可主动限制显示总量 |
-| `declaredSlots` | `12` | 给「交付」文件保留的席位（0–200） |
-| `maxSessions` | `0` | 0 表示所有可见会话；正数限制最近会话数量。关闭交付来源请用 `includePresent: false` |
-| `maxSessionAgeDays` | `0` | 只看最近多少天内活跃过的 Session（0 表示不限制） |
-| `scanDepth` | `5` | 目录扫描深度（0–20） |
-| `maxScanFiles` | `0` | 0 表示不限扫描条目；正数可主动限制扫描预算 |
-| `cacheMs` | `15000` | 磁盘扫描结果的缓存时间 |
-| `includePresent` | `true` | 是否包含交付记录 |
-| `includeFiles` | `true` | 是否包含文件扫描 |
-| `extraRoots` | `[]` | 额外要扫描的绝对路径 |
-| `ignoreRoots` | `[]` | 不扫描的绝对路径（其子目录也跳过） |
-| `extensions` | 内置清单 | 覆盖文件扫描的扩展名清单，例如 `[pdf, html, docx]` |
-
-## HTTP 接口
-
-四个路由都注册在 Connection 的鉴权围栏内（`ctx.connection.fetch.register`），只有本页面的 owner 身份能调用：
-
-- `GET /api/recent-deliverables.list` → 合并后的列表、统计、能力位。
-- `GET /api/recent-deliverables.file?path=<绝对路径>` → 列出的文件字节（内嵌预览 / 新标签页）。
-- `POST /api/recent-deliverables.open?path=<绝对路径>[&action=reveal]` → 用桌面默认应用打开 / 在文件管理器中显示。
-
-- `POST /api/recent-deliverables.delete`，JSON `{path, token}` → 将一个列表内且未变化的文件移到系统废纸篓；token 由列表项的 `deleteToken` 提供。
-
-安全约束：
-
-- 读取和打开前先解析真实路径，再检查目录边界。扫描不会将指向工作区外的符号链接加入列表；`..` 和符号链接不能绕过工作区限制。显式通过 `present` 声明并列出的工作区外成品仍可访问；列表记录当时的真实目标，修改符号链接不会自动授权新目标。
-- 生成的 HTML/SVG 以 `Content-Security-Policy: sandbox …` 返回：脚本可以跑（图表能显示），但文档处于不透明源，碰不到 Harness 页面。
-- 本插件不写 Session 日志；扫描全程只读。只有点击删除按钮时才移动选定文件，且不提供永久删除的降级行为。
-
-## 目录
-
-```
-index.js            Host 半：路由、Session 折叠、文件扫描、系统打开
-logic.js            纯函数：扩展名/类型、合并排序、配置归一化（可单测）
-client.js           浏览器半：shell.overlay 浮窗 + 预览大窗（无构建步骤）
-cordis.patch.yml    bundle 行
-locale/{en,zh}.json 插件管理器里显示的标题/描述
-icon.svg            原始图标
-test/logic.test.mjs  纯函数单测：node test/logic.test.mjs
-test/client.test.mjs 浏览器半的接线 + 转发助手单测：node test/client.test.mjs
+```bash
+npm ci --ignore-scripts
+npm test
+npm pack --dry-run
 ```
 
-## 已知限制
+测试覆盖列表合并与无限计数、语言和本机设置、拖选范围、失效操作令牌、批量部分成功、真实临时文件重命名、同名保护、符号链接、写入失败回滚和旧响应竞态。CI 在 Windows、macOS、Linux 运行。宣传图来自真实插件界面与示例文件，图文排版保存在 `docs/images/`。
 
-- 文件扫描是启发式的「最近修改」，包含中间产物（例如生成报告时的配图）。要看「真正的成品」，点「交付」筛选；想让它更准，就多让 agent 用 `present`。
-- 预览依赖浏览器自带的 PDF/图片/文本查看器；Office 文档不内嵌渲染（交给系统应用）。
-- 浮窗固定在视口右上角，右侧栏打开时会盖住右侧栏顶部，可折叠成药丸避开。
-- 面板数据只在 Web GUI 有意义（Host 在无 `connection` 服务的组合里不会激活）。
-- 「转发到 IM 助理」依赖 IM 助理的既有投递链路，所以聊天里会多一条助手确认消息；如果希望完全静默地推送文件，需要 IM 助理重新提供主动投递接口。
+## 已知范围
 
+- 文件扫描依赖修改时间，会包括中间产物；「交付」筛选更适合查看显式成品。
+- PDF、图片、网页和文本使用浏览器预览；Office 交给系统应用。预览能力由浏览器与系统决定。
+- 浮窗通过 `shell.overlay` 挂载，只对 Web 界面有意义。转发到 IM 助理需要额外安装相应插件并绑定聊天。
 
-## npm 安装
+## English
 
-安装包名：`dsh-recent-deliverables`。在 DSH 的“设置 → 插件 → 添加插件 → 安装第三方插件”中输入包名，安装后重启 DSH。
+**Recent Deliverables** keeps files produced in DeepSeek Harness within reach. Preview PDF, HTML, images and text; open Office files in their native apps; search or filter the full collected list.
 
-本地目录安装方法见 [INSTALL.md](./INSTALL.md)。
+Version 1.4 adds a symmetric little trash bin with one heart, drag-to-select batch cleanup, direct inline renaming with collision protection, a persistent show/hide-times setting, and a filter strip without an overlapping scrollbar. Chinese/English, local cartoon avatars and outside-click collapse are included.
+
+The first 100 file rows render initially, with more appended on scroll; the total remains complete. Content loads when a preview opens, and the collapsed capsule refreshes less often. Moving files to OS trash is recoverable; disk space is reclaimed when the OS trash is emptied. No measured RAM-saving percentage is claimed.
+
+Windows and macOS are supported; core tests also run on Linux. Real DSH/browser interaction has been verified on macOS; Windows desktop UI verification is still pending. Install the latest [GitHub Release](https://github.com/FelixJiashengFu/dsh-recent-deliverables/releases/latest) using the [installation guide](./INSTALL.md), then fully restart DSH.
 
 ## License
 
