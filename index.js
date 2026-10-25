@@ -200,7 +200,16 @@ async function buildList(ctx, state) {
 
   // Only paths this Host actually listed may be streamed or opened by the
   // browser; the Set is rebuilt on every collection.
-  state.servable = new Set(merged.items.map((item) => withoutTrailingSeparators(item.path)))
+  const canonicalRoots = (await Promise.all(roots.map(async (root) => {
+    try { return await realpath(root.path) } catch { return undefined }
+  }))).filter(Boolean)
+  state.servable = new Set((await Promise.all(merged.items.map(async (item) => {
+    try {
+      const target = await realpath(item.path)
+      return item.origin === 'present' || canonicalRoots.some((root) => isPathInside(root, target))
+        ? target : undefined
+    } catch { return undefined }
+  }))).filter(Boolean))
 
   return {
     cache: pending !== true,
@@ -589,6 +598,8 @@ async function scanRoots(state, roots) {
  * @param sink - budget and collection callbacks.
  */
 async function walkRoot(root, maxDepth, extensions, sink) {
+  let canonicalRoot
+  try { canonicalRoot = await realpath(root.path) } catch { return }
   let frontier = [{ dir: root.path, depth: 0 }]
   while (frontier.length > 0) {
     const next = []
@@ -615,6 +626,10 @@ async function walkRoot(root, maxDepth, extensions, sink) {
         const kind = kindOfPath(entryName, extensions)
         if (kind === null) continue
         const path = join(node.dir, entryName)
+        // Scanning a symlink must not silently grant access outside this root.
+        let target
+        try { target = await realpath(path) } catch { continue }
+        if (!isPathInside(canonicalRoot, target)) continue
         const info = await fileInfo(path)
         if (info === null) continue
         sink.push({
@@ -658,10 +673,16 @@ async function fileInfo(path) {
  * @returns whether the path is servable.
  */
 async function isKnownPath(ctx, state, path) {
-  const normalized = withoutTrailingSeparators(path)
-  if (state.servable.has(normalized)) return true
+  // Callers supply a realpath, so neither dot segments nor symlink aliases
+  // can pass a lexical prefix check before escaping the workspace.
+  if (state.servable.has(path)) return true
   const roots = resolveRoots(ctx, [], state.options)
-  return roots.some((root) => isPathInside(root.path, normalized))
+  for (const root of roots) {
+    try {
+      if (isPathInside(await realpath(root.path), path)) return true
+    } catch { /* a missing workspace grants no access */ }
+  }
+  return false
 }
 
 /**
@@ -675,14 +696,13 @@ async function fileResponse(ctx, state, request) {
   const url = new URL(request.url)
   const requested = (url.searchParams.get('path') ?? '').trim()
   if (!isAbsolutePath(requested)) return json({ error: 'bad-path' }, 400)
-  if (!(await isKnownPath(ctx, state, requested))) return json({ error: 'forbidden' }, 403)
-
   let target
   try {
     target = await realpath(requested)
   } catch {
     return json({ error: 'not-found' }, 404)
   }
+  if (!(await isKnownPath(ctx, state, target))) return json({ error: 'forbidden' }, 403)
   const info = await fileInfo(target)
   if (info === null) return json({ error: 'not-found' }, 404)
 
@@ -722,7 +742,9 @@ async function openResponse(ctx, state, request) {
   const requested = (url.searchParams.get('path') ?? '').trim()
   const action = url.searchParams.get('action') === 'reveal' ? 'reveal' : 'open'
   if (!isAbsolutePath(requested)) return json({ error: 'bad-path' }, 400)
-  if (!(await isKnownPath(ctx, state, requested))) return json({ error: 'forbidden' }, 403)
+  let target
+  try { target = await realpath(requested) } catch { return json({ error: 'not-found' }, 404) }
+  if (!(await isKnownPath(ctx, state, target))) return json({ error: 'forbidden' }, 403)
 
   const controller = ctx.get('sessionController')
   if (controller === undefined || typeof controller.openWorkspacePath !== 'function') {
@@ -732,7 +754,7 @@ async function openResponse(ctx, state, request) {
   if (desktop?.available !== true) return json({ error: 'desktop-unavailable' }, 409)
 
   try {
-    await controller.openWorkspacePath({ path: requested, ...(action === 'reveal' ? { action } : {}) }, request.signal)
+    await controller.openWorkspacePath({ path: target, ...(action === 'reveal' ? { action } : {}) }, request.signal)
     return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

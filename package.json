@@ -1,6 +1,6 @@
 {
   "name": "dsh-recent-deliverables",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Claude-style floating panel that lists the files you produced most recently (PDF, HTML, Office, images, ...) and opens, previews, or reveals them.",
   "type": "module",
   "exports": {
@@ -18,7 +18,8 @@
     "icon.svg",
     "README.md",
     "INSTALL.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "icon": "./icon.svg",
   "dsh": {
@@ -49,10 +50,11 @@
     "url": "https://github.com/FelixJiashengFu/dsh-recent-deliverables/issues"
   },
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "prepublishOnly": "npm test"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18.17.0"
   },
   "publishConfig": {
     "access": "public"

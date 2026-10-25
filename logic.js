@@ -270,7 +270,7 @@ export function compareByMtimeDesc(left, right) {
  * @param present - items carrying `origin: 'present'` plus declarations.
  * @param files - items carrying `origin: 'file'`.
  * @param maxItems - hard cap on the returned list length.
- * @param declaredSlots - maximum declared items kept ahead of the fill (default 12).
+ * @param declaredSlots - reserved declared items kept ahead of the fill (default 12).
  * @returns the merged list and the counts the footer reports.
  */
 export function mergeDeliverables(present, files, maxItems, declaredSlots) {
@@ -304,19 +304,19 @@ export function mergeDeliverables(present, files, maxItems, declaredSlots) {
   const slots =
     Number.isSafeInteger(declaredSlots) && declaredSlots >= 0 ? Math.min(declaredSlots, cap) : Math.min(12, cap)
   const declaredItems = all.filter((item) => item.origin === 'present')
-  const plainItems = all.filter((item) => item.origin !== 'present')
   const keptDeclared = declaredItems.slice(0, slots)
-  const keptPlain = plainItems.slice(0, Math.max(0, cap - keptDeclared.length))
-  const items = [...keptDeclared, ...keptPlain].sort(compareByMtimeDesc)
+  const reserved = new Set(keptDeclared.map((item) => item.path))
+  const remaining = all.filter((item) => !reserved.has(item.path)).slice(0, cap - keptDeclared.length)
+  const items = [...keptDeclared, ...remaining].sort(compareByMtimeDesc)
   return {
     items,
     counts: {
       merged: all.length,
       declared,
-      declaredShown: keptDeclared.length,
+      declaredShown: items.filter((item) => item.origin === 'present').length,
       scanned: (Array.isArray(files) ? files : []).length,
       shown: items.length,
-      truncated: all.length > cap,
+      truncated: all.length > items.length,
     },
   }
 }

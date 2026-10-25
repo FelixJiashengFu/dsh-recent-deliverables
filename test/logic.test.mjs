@@ -200,6 +200,28 @@ test('mergeDeliverables keeps every item when under the cap', () => {
   assert.equal(result.counts.truncated, false)
 })
 
+test('declared slots reserve space without limiting declared-only lists', () => {
+  const present = Array.from({ length: 50 }, (_, i) => ({ path: `/w/${i}.pdf`, origin: 'present', mtime: i }))
+  const under = mergeDeliverables(present.slice(0, 20), [], 40, 12)
+  assert.equal(under.items.length, 20)
+  assert.equal(under.counts.declaredShown, 20)
+  assert.equal(under.counts.truncated, false)
+  const over = mergeDeliverables(present, [], 40, 12)
+  assert.equal(over.items.length, 40)
+  assert.equal(over.counts.truncated, true)
+  assert.equal(mergeDeliverables(present.slice(0, 20), [], 40, 0).items.length, 20)
+})
+
+test('spare list capacity is filled by remaining declarations in time order', () => {
+  const present = Array.from({ length: 8 }, (_, i) => ({ path: `/w/${i}.pdf`, origin: 'present', mtime: i }))
+  const files = [{ path: '/w/new.png', origin: 'file', mtime: 100 }]
+  const result = mergeDeliverables(present, files, 6, 2)
+  assert.equal(result.items.length, 6)
+  assert.equal(result.counts.declaredShown, 5)
+  assert.equal(result.items[0].path, '/w/new.png')
+  assert.equal(result.counts.truncated, true)
+})
+
 test('publicItem normalizes and drops empty optional fields', () => {
   const item = publicItem({
     path: '/w/report.pdf',
