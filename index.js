@@ -237,7 +237,8 @@ async function buildList(ctx, state) {
   // the scan below is awaited first so a fold that lands during it is included.
   const fold = options.includePresent ? ensurePresentFold(ctx, state, summaries) : undefined
   const files = options.includeFiles ? await scanRoots(state, roots) : []
-  const declared = await Promise.all(state.present.items.map(async (item) => {
+  const presentSnapshot = state.present.items
+  const declared = await Promise.all(presentSnapshot.map(async (item) => {
     const original = item.originalPath || item.path
     let path = followAlias(state.aliases, original)
     if (path !== original && await fileInfo(path) === null) path = original
@@ -255,7 +256,9 @@ async function buildList(ctx, state) {
   const merged = mergeDeliverables(live.filter((item) => item.origin === 'present'),
     live.filter((item) => item.origin !== 'present'), options.maxItems, options.declaredSlots)
   const items = merged.items.map(publicItem).filter(Boolean)
-  const pending = fold !== undefined && state.present.status !== 'ready'
+  // A fold can finish while filesystem work awaits. Only mark complete when this
+  // response actually includes that fold, otherwise request a follow-up list.
+  const pending = fold !== undefined && (state.present.status !== 'ready' || state.present.items !== presentSnapshot)
   if (revision === state.revision) {
     state.servable = new Set(merged.items.map((item) => item.canonical))
     state.deleteTickets = new Map(merged.items.map((item) => [item.path, item.ticket]))

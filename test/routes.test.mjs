@@ -142,7 +142,7 @@ test('deleting a displayed file trashes its exact literal name and updates count
     moved = join(f.base, 'trashed.txt')
     await rename(path, moved)
   })
-  const path = join(f.root, '[star]*.txt')
+  const path = join(f.root, process.platform === 'win32' ? '[star].txt' : '[star]*.txt')
   await writeFile(path, 'selected file')
   const first = await (await f.call('list')).json()
   const item = first.items.find((item) => item.path === path)

@@ -9,6 +9,7 @@
 - Add a persistent show/hide-times preference for date groups, relative file times and updated timestamps. Keep existing language, avatar and position preferences.
 - Hide the overlapping horizontal chip scrollbar with scoped styles while retaining horizontal scrolling and keyboard access.
 - Add four promotional images based on the actual UI, rewrite the README and cross-platform installation guide, and explain file organization, recoverable trash, first-batch rendering and on-demand previews without unmeasured RAM claims.
+- Fix a background-fold race that could mark a list complete before including freshly collected declarations.
 - Expand CI to Windows, macOS and Linux; add batch, rename, rollback, alias, portable-name and stale-response regressions.
 
 ## 1.3.0 — 2026-10-25
