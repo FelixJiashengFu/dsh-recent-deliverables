@@ -1,7 +1,7 @@
 {
   "name": "dsh-recent-deliverables",
-  "version": "1.6.0",
-  "description": "A resizable floating file panel for DeepSeek Harness: right-aligned clock and weather, smooth batch selection, heart-bubble trash, inline renaming, complete counts and Chinese/English.",
+  "version": "1.7.0",
+  "description": "A resizable floating file panel for DeepSeek Harness: automatic categories and folders, a capsule organizer editor, naturally wrapping filenames, inline rename, batch trash, clock/weather and Chinese/English.",
   "type": "module",
   "exports": {
     ".": "./index.js",
@@ -14,6 +14,7 @@
     "logic.js",
     "file-operations.js",
     "weather.js",
+    "organizer.js",
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",

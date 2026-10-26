@@ -1,10 +1,10 @@
-# 安装 · Install 1.6.0
+# 安装 · Install 1.7.0
 
 给 **DeepSeek Harness Desktop / Web 插件系统** 使用。支持 Windows 和 macOS；需要宿主 Node.js 18.17.0+。插件依赖 `trash` 调用系统废纸篓 / 回收站，安装时需要获取 npm 依赖。
 
 ## 从发布包安装
 
-从 [GitHub Releases](https://github.com/FelixJiashengFu/dsh-recent-deliverables/releases/latest) 下载 `dsh-recent-deliverables-1.6.0.tgz`。若 npm 未同步最新版，直接使用这个包即可。
+从 [GitHub Releases](https://github.com/FelixJiashengFu/dsh-recent-deliverables/releases/latest) 下载 `dsh-recent-deliverables-1.7.0.tgz`。若 npm 未同步最新版，直接使用这个包即可。
 
 **方式 A：DSH CLI 安装压缩包**
 
@@ -13,13 +13,13 @@
 macOS / Linux：
 
 ```bash
-dsh plugin --profile desktop add 'dsh-recent-deliverables@file:/绝对路径/dsh-recent-deliverables-1.6.0.tgz' --ignore-scripts --registry=https://registry.npmjs.org/
+dsh plugin --profile desktop add 'dsh-recent-deliverables@file:/绝对路径/dsh-recent-deliverables-1.7.0.tgz' --ignore-scripts --registry=https://registry.npmjs.org/
 ```
 
 Windows PowerShell：
 
 ```powershell
-dsh plugin --profile desktop add 'dsh-recent-deliverables@file:C:/Users/你的用户名/Downloads/dsh-recent-deliverables-1.6.0.tgz' --ignore-scripts --registry=https://registry.npmjs.org/
+dsh plugin --profile desktop add 'dsh-recent-deliverables@file:C:/Users/你的用户名/Downloads/dsh-recent-deliverables-1.7.0.tgz' --ignore-scripts --registry=https://registry.npmjs.org/
 ```
 
 桌面版的 CLI 可能需要使用应用内附带的 `dsh` 可执行文件。`--profile desktop` 换成当前使用的 profile。
@@ -40,7 +40,9 @@ dsh plugin --profile desktop add 'dsh-recent-deliverables@link:/绝对路径/dsh
 
 ## 验证升级
 
-- 设置 → 插件中版本为 **1.6.0**，页面右上角出现成品浮窗。
+- 设置 → 插件中版本为 **1.7.0**，页面右上角出现成品浮窗。
+- 展开后有「按分类 / 按目录」和「编辑分类与目录」；编辑会打开独立的圆角胶囊面板，设置在保存后生效。
+- 缩窄浮窗时，长文件名、说明和元信息会完整换行，「交付」标签保持横排。
 - 小垃圾桶居中，点击后才冒出几颗爱心泡泡；按住向下拖时，操作栏在原位切换，列表不会下跳。点「移到废纸篓」执行批量整理。
 - 点文件名可以编辑，Enter 保存、Esc 取消；同名会提示，不覆盖文件。
 - 展开浮窗后，四边和四角可以拖动缩放；刷新或收成胶囊再展开会记住宽高。双击边缘 / 角落，或在设置中点「恢复默认大小」。
@@ -51,10 +53,10 @@ dsh plugin --profile desktop add 'dsh-recent-deliverables@link:/绝对路径/dsh
 
 ## 已发布到 npm 后
 
-在添加插件里输入 `dsh-recent-deliverables@1.6.0`，或运行：
+在添加插件里输入 `dsh-recent-deliverables@1.7.0`，或运行：
 
 ```bash
-dsh plugin --profile desktop add dsh-recent-deliverables@1.6.0
+dsh plugin --profile desktop add dsh-recent-deliverables@1.7.0
 ```
 
 npm 与 GitHub 发布状态可能不同。若提示没有这个版本，使用上面的 GitHub 发布包。
@@ -65,7 +67,7 @@ DSH 设置 → 插件 → `dsh-recent-deliverables` → 卸载；或 `dsh plugin
 
 ## English
 
-Download `dsh-recent-deliverables-1.6.0.tgz` from [Releases](https://github.com/FelixJiashengFu/dsh-recent-deliverables/releases/latest). Install it with the DSH CLI using the explicit `dsh-recent-deliverables@file:/absolute/path/package.tgz` spec above.
+Download `dsh-recent-deliverables-1.7.0.tgz` from [Releases](https://github.com/FelixJiashengFu/dsh-recent-deliverables/releases/latest). Install it with the DSH CLI using the explicit `dsh-recent-deliverables@file:/absolute/path/package.tgz` spec above.
 
 For a local directory install, extract the package into a permanent folder, run `npm install --omit=dev --ignore-scripts` there, then add that folder's absolute path in DSH Settings → Plugins. Keep the folder in place. Fully quit and reopen DSH after upgrading.
 

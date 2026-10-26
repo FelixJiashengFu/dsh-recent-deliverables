@@ -2,11 +2,11 @@
 
 **做出来的文件，都在手边。** 一个给 DeepSeek Harness 用的成品浮窗，集中查看 PDF、网页、Office、图片和文本，直接预览、改名、整理，或用系统应用打开。
 
-![Recent Deliverables 1.6.0：完整计数、拖选整理、直接改名、时间开关和卡通胶囊](https://raw.githubusercontent.com/FelixJiashengFu/dsh-recent-deliverables/main/docs/images/hero.png)
+![Recent Deliverables 1.7.0：自动识别分类和目录、胶囊编辑器和完整换行](https://raw.githubusercontent.com/FelixJiashengFu/dsh-recent-deliverables/main/docs/images/hero.png)
 
 [下载最新版](https://github.com/FelixJiashengFu/dsh-recent-deliverables/releases/latest) · [安装说明](./INSTALL.md) · [更新记录](./CHANGELOG.md) · [English](#english)
 
-## 1.6.0：右侧一排时钟天气，浮窗大小随手调
+## 1.7.0：自动识别，随心编辑，文字自然换行
 
 | 操作 | 结果 |
 | --- | --- |
@@ -24,6 +24,26 @@
 批量整理会显示选中数量；可取消选择，也可用「全选当前结果」处理搜索 / 筛选后的全部结果，包含还没渲染出来的行。移到废纸篓后计数立即更新；若一部分文件已改变或无法移动，会保留失败的选择并提示结果。只移动你选中的文件，不删除目录，不永久擦除；符号链接只移动链接本身，保留指向的文件。
 
 重命名会改动磁盘上的真实文件名，保留文件内容。遇到同名目标会提示，**不会覆盖已有文件**；拒绝路径分隔符和 Windows 保留名。重命名后的交付文件会继续对应到原交付记录，本机重命名映射保存在 DSH 数据目录的 `recent-deliverables/renames.json`，不修改会话日志。文件扩展名建议保留，以便系统继续识别文件类型。
+
+## 自动分类与目录，也保留你的编辑能力
+
+展开浮窗，点击 **按分类 / 按目录** 切换浏览方式；右侧的 **编辑分类与目录** 会打开独立的胶囊式编辑面板。柔和展开动画、模糊背景与圆角卡片让编辑过程更清楚，保存 / 取消始终在底部可见；支持键盘焦点循环、Esc 取消和减少动态效果。
+
+- **分类自动识别**：按扩展名归入 PDF、网页、文档、表格、图片等类型，有文件的分类自动出现。新类型加入后，已有自定义名称与顺序继续保留。
+- **分类手动调整**：编辑显示名称、上移 / 下移、显示 / 隐藏；也可创建自己的分类规则。扩展名用逗号分隔，可追加“文件名包含”关键词；同时填写时需同时满足，不区分大小写。同一文件可以属于多个分类，总数仍只计算一次。
+- **目录自动发现**：从 DSH 工作区、默认工作目录和会话工作目录收集，不需要逐个填写。按目录浏览包含该目录下的文件。
+- **目录手动调整**：改显示名称、排序、暂停 / 恢复收集、补充可读取的绝对目录路径。暂停父目录会覆盖其子目录，原配置中的排除目录仍然有效。移出手动目录只调整收集范围，原文件与目录保持原样。
+- **保存后生效**：编辑中不改动列表；取消会丢弃本次修改。“恢复自动设置”也是先修改草稿，再点保存才生效。冲突、不可读目录或写入失败会明确提示，并保留修改。
+
+整理偏好保存在 DSH 数据目录的 `recent-deliverables/organizer.json`，与浏览器中的外观偏好分开。API 使用版本校验与原子写入防止同一宿主里的并发编辑覆盖；列表刷新会忽略保存前的旧设置。目录修改不重命名磁盘目录，也不修改会话日志。扫描深度、扩展名范围与文件访问边界仍受原配置约束。
+
+![自动识别与手动编辑，独立胶囊式整理界面](https://raw.githubusercontent.com/FelixJiashengFu/dsh-recent-deliverables/main/docs/images/automatic.png)
+
+## 缩窄后，文字顺着往下排
+
+长文件名、会话 / 目录名称、文件元信息和说明会根据可用宽度完整换行，不再强制省略或截断两行。“交付”标签保持横排，空间不足时整体换到下一行。转发 / 打开 / 定位按钮放到文字下方，不再占住右侧文字宽度；垃圾桶仍在右侧。进入多选时文件行的高度、文字宽度和列表位置保持一致。
+
+![窄窗口与宽窗口下的完整文字重排](https://raw.githubusercontent.com/FelixJiashengFu/dsh-recent-deliverables/main/docs/images/reflow.png)
 
 ## 四边四角都能调整大小
 
@@ -81,7 +101,7 @@
 
 支持 **Windows 与 macOS** 的 DSH Web 插件系统；Windows 使用系统回收站，macOS 使用系统废纸篓。自动化测试覆盖 Windows、macOS、Linux；真实 DSH / 浏览器交互在 Mac 上验证，Windows 桌面界面仍需实机验证。
 
-从 [GitHub Releases](https://github.com/FelixJiashengFu/dsh-recent-deliverables/releases/latest) 下载 `dsh-recent-deliverables-1.6.0.tgz`，通过 DSH CLI 安装，或解压成固定本地目录后在图形界面添加。两种方法见 [INSTALL.md](./INSTALL.md)。若 npm 尚未同步最新版，请优先使用 Releases 包；包名为 `dsh-recent-deliverables`。
+从 [GitHub Releases](https://github.com/FelixJiashengFu/dsh-recent-deliverables/releases/latest) 下载 `dsh-recent-deliverables-1.7.0.tgz`，通过 DSH CLI 安装，或解压成固定本地目录后在图形界面添加。两种方法见 [INSTALL.md](./INSTALL.md)。若 npm 尚未同步最新版，请优先使用 Releases 包；包名为 `dsh-recent-deliverables`。
 
 升级后请**完全退出并重新打开 DSH**，让宿主路由与前端同时更新。
 
@@ -116,7 +136,7 @@
 
 ## HTTP 接口与文件边界
 
-七个路由均注册在宿主 Connection 的鉴权围栏内：
+八个路由均注册在宿主 Connection 的鉴权围栏内：
 
 | 路由 | 用途 |
 | --- | --- |
@@ -126,6 +146,7 @@
 | `POST /api/recent-deliverables.delete` | JSON `{path, token}`，移动一份未变化的文件 |
 | `POST /api/recent-deliverables.delete-batch` | JSON `{files: [{path, token}]}`，每个请求最多 200 项，逐项返回结果；客户端自动分批 |
 | `POST /api/recent-deliverables.rename` | JSON `{path, token, name}`，同目录中重命名，不覆盖目标 |
+| `GET/POST /api/recent-deliverables.organizer` | 读取自动目录与整理偏好；JSON `{preferences, revision}` 保存名称、顺序、规则和收集范围 |
 | `GET /api/recent-deliverables.weather` | 可选天气，缓存近似城市与当前天气；只在启用天气时调用 |
 
 读取和打开前解析真实路径、检查目录边界；`..` 和符号链接不能绕过工作区限制。显式交付并列出的工作区外文件仍可使用。删除和改名核对列表令牌与文件身份，拒绝已更换的文件或链接；并发重复操作不会重复移动。HTML / SVG 预览处于沙盒中，不得访问宿主页面。
@@ -188,7 +209,7 @@ npm pack --dry-run
 
 **Recent Deliverables** keeps files produced in DeepSeek Harness within reach. Preview PDF, HTML, images and text; open Office files in their native apps; search or filter the full collected list.
 
-Version 1.6 moves the clock and weather into one horizontal row on the right and adds resizing from all four edges and corners. Preferred dimensions persist across reloads and capsule toggles, stay within the viewport, and can be reset by double-clicking a resize handle or in Appearance & language. Keyboard resizing is supported. Version 1.5 keeps selection controls in a fixed space, so entering batch selection preserves list position, row height and text width. The centered trash bin releases heart bubbles only after a click. Independent local-clock and automatic-weather switches join file-time preferences. Direct inline renaming, collision protection and the clean filter strip remain available. Chinese/English, local cartoon avatars and outside-click collapse are included. The clock follows the browser computer’s timezone and works offline. Optional weather uses approximate host-IP location from ipapi.co and Open-Meteo data; it may reflect a VPN or remote host city, and sends no file data. Weather requests are cached for 20 minutes. Open-Meteo’s free API is for non-commercial use; see its terms above.
+Version 1.7 adds automatically detected file categories and workspace/session folders, with editable names, order, visibility, custom extension/filename rules and additional folder scope. A separate capsule editor keeps edits in a draft until saved; changes persist atomically with a revision check. Pausing or removing a folder changes collection scope without moving original files. Long filenames, descriptions and metadata wrap naturally as the panel narrows, and delivery badges stay horizontal. Row actions sit below the text, preserving available width. Version 1.6 moves the clock and weather into one horizontal row on the right and adds resizing from all four edges and corners. Preferred dimensions persist across reloads and capsule toggles, stay within the viewport, and can be reset by double-clicking a resize handle or in Appearance & language. Keyboard resizing is supported. Version 1.5 keeps selection controls in a fixed space, so entering batch selection preserves list position, row height and text width. The centered trash bin releases heart bubbles only after a click. Independent local-clock and automatic-weather switches join file-time preferences. Direct inline renaming, collision protection and the clean filter strip remain available. Chinese/English, local cartoon avatars and outside-click collapse are included. The clock follows the browser computer’s timezone and works offline. Optional weather uses approximate host-IP location from ipapi.co and Open-Meteo data; it may reflect a VPN or remote host city, and sends no file data. Weather requests are cached for 20 minutes. Open-Meteo’s free API is for non-commercial use; see its terms above.
 
 The first 100 file rows render initially, with more appended on scroll; the total remains complete. Content loads when a preview opens, and the collapsed capsule refreshes less often. Moving files to OS trash is recoverable; disk space is reclaimed when the OS trash is emptied. No measured RAM-saving percentage is claimed.
 

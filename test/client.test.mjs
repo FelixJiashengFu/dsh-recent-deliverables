@@ -422,6 +422,44 @@ test('four resize corners combine axes and stop at minimum sizes or screen edges
   assert.equal(large.right, 8); assert.equal(large.top + large.height, 792)
 })
 
+test('automatic categories keep new types and support explicit custom rules and overrides', () => {
+  const helpers = new Function(`${extractConst('KIND_FILTERS')}\nconst t = (key) => key;\n${extractFunction('blankOrganizer')}\n${extractFunction('matchesCategory')}\n${extractFunction('categoryFilters')}\nreturn { categoryFilters, blankOrganizer, matchesCategory }`)()
+  const prefs = helpers.blankOrganizer()
+  prefs.categories.custom = [{ id: 'custom-papers', name: 'Final papers', extensions: ['pdf'], contains: 'final' }]
+  prefs.categories.names = [{ id: 'pdf', label: 'Papers' }]
+  prefs.categories.order = ['custom-papers', 'all', 'pdf']
+  prefs.categories.hidden = ['image']
+  const items = [{ name: 'FINAL.PDF', ext: 'pdf', kind: 'pdf' }, { name: 'draft.pdf', ext: 'pdf', kind: 'pdf' }, { name: 'final.txt', ext: 'txt', kind: 'text' }, { name: 'photo.png', ext: 'png', kind: 'image' }]
+  const filters = helpers.categoryFilters(items, prefs)
+  assert.equal(filters[0].key, 'custom-papers')
+  assert.equal(filters[0].count, 1)
+  assert.equal(filters.find((item) => item.key === 'pdf').label, 'Papers')
+  assert.equal(filters.some((item) => item.key === 'image'), false)
+  assert.equal(filters.some((item) => item.key === 'text'), true)
+  assert.equal(helpers.categoryFilters([...items, { name: 'table.xlsx', kind: 'sheet' }], prefs).some((item) => item.key === 'sheet'), true)
+})
+
+test('directory filters keep sibling prefixes distinct and match Windows drive paths', () => {
+  const inside = new Function(`${extractFunction('inDirectory')}\nreturn inDirectory`)()
+  assert.equal(inside({ path: '/projects/one/report.pdf' }, '/projects/one/'), true)
+  assert.equal(inside({ path: '/projects/one-other/report.pdf' }, '/projects/one'), false)
+  assert.equal(inside({ path: 'C:/Projects/REPORT.pdf' }, 'c:/projects'), true)
+  assert.equal(inside({ path: '/outside/report.pdf' }, null), true)
+})
+
+test('a saved organizer cannot be replaced by an older list response', async () => {
+  let respond
+  const create = new Function('fetch', 'window', `${extractConst('LIST_URL')}\n${extractFunction('createStore')}\nreturn createStore`)(() => new Promise((resolve) => { respond = resolve }), { setTimeout, clearTimeout })
+  const state = create()
+  const pending = state.load()
+  state.setOrganizer({ preferences: { directories: { extra: [] } }, revision: 'new', directories: [{ path: '/new', enabled: true }, { path: '/paused', enabled: false }] })
+  respond({ ok: true, json: async () => ({ items: [], roots: [{ path: '/old' }], organizer: { revision: 'old' } }) })
+  await pending
+  assert.equal(state.get().organizer.revision, 'new')
+  assert.deepEqual(state.get().roots.map((root) => root.path), ['/new'])
+  state.dispose()
+})
+
 for (const { name, fn } of cases) {
   try {
     await fn()

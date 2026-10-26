@@ -24,6 +24,7 @@ window.__ModuleLoader__.load({
     const DELETE_URL = 'api/recent-deliverables.delete'
     const BATCH_DELETE_URL = 'api/recent-deliverables.delete-batch'
     const RENAME_URL = 'api/recent-deliverables.rename'
+    const ORGANIZER_URL = 'api/recent-deliverables.organizer'
     const WEATHER_URL = 'api/recent-deliverables.weather'
     const WEATHER_MS = 20 * 60 * 1000
     const ROW_BATCH = 100
@@ -94,6 +95,57 @@ window.__ModuleLoader__.load({
 
     const DICTIONARY = {
       en: {
+        "organizer.title": "Categories & folders",
+        "organizer.subtitle": "Automatically collected. Personally organized.",
+        "organizer.categories": "Categories",
+        "organizer.directories": "Folders",
+        "organizer.edit": "Edit categories and folders",
+        "organizer.autoOn": "Auto discovery on",
+        "organizer.loading": "Reading organizer settings…",
+        "organizer.loadError": "Could not read organizer settings. Try again.",
+        "organizer.autoCategories": "Automatic types, with your own rules",
+        "organizer.categoryHint": "Files are grouped by type. Categories appear when they contain files. Rename, reorder or hide them, or add your own rules.",
+        "organizer.categoryName": "Category name",
+        "organizer.showCategory": "Show category",
+        "organizer.show": "Show",
+        "organizer.automatic": "Auto detected",
+        "organizer.custom": "Custom rule",
+        "organizer.up": "Move up",
+        "organizer.down": "Move down",
+        "organizer.extensions": "Extensions (comma separated)",
+        "organizer.contains": "Filename contains",
+        "organizer.removeCategory": "Remove this category rule",
+        "organizer.newCategory": "My PDFs",
+        "organizer.addCategory": "Add a custom category",
+        "organizer.autoDirectories": "Workspaces and session folders, discovered",
+        "organizer.directoryHint": "Follows DSH workspaces and session folders automatically. Set display names, change the order, pause collection or add a folder.",
+        "organizer.directoryName": "Folder display name",
+        "organizer.manual": "Manually added",
+        "organizer.unavailable": "Unavailable for now",
+        "organizer.parentDisabled": "Parent folder is paused",
+        "organizer.collect": "Collect",
+        "organizer.removeDirectory": "Remove from collection",
+        "organizer.noDirectories": "No folders discovered yet. You can add one.",
+        "organizer.addDirectory": "Add a folder to collect",
+        "organizer.directoryPath": "Absolute folder path on this computer",
+        "organizer.directoryPlaceholder": "For example /Users/you/Projects or C:\\Projects",
+        "organizer.add": "Add",
+        "organizer.filesSafe": "These settings change collection and display names. Your original files and folders stay in place.",
+        "organizer.conflict": "Settings changed elsewhere. Reload them before saving your edits.",
+        "organizer.directoryError": "Could not read folder: {path}. Check the path and access permissions.",
+        "organizer.ruleError": "Enter a category name and at least one extension or filename keyword.",
+        "organizer.saveError": "Could not save. Your edits are still here. Try again.",
+        "organizer.reload": "Reload settings",
+        "organizer.saving": "Saving…",
+        "organizer.unsaved": "Unsaved changes",
+        "organizer.autoHint": "Auto discovery stays on",
+        "organizer.reset": "Reset to automatic",
+        "organizer.cancel": "Cancel",
+        "organizer.save": "Save settings",
+        "organizer.saved": "Categories and folders updated",
+        "organizer.allDirectories": "All folders",
+        "organizer.filterTypes": "By category",
+        "organizer.filterDirectories": "By folder",
         'resize.title': 'Resize panel',
         'resize.hint': 'Drag any edge or corner · arrow keys adjust · double-click or Home resets size',
         'resize.reset': 'Reset panel size',
@@ -264,6 +316,57 @@ window.__ModuleLoader__.load({
         'platform.slack': 'Slack',
       },
       zh: {
+        "organizer.title": "分类与目录",
+        "organizer.subtitle": "自动收集，也按你的习惯整理",
+        "organizer.categories": "分类",
+        "organizer.directories": "目录",
+        "organizer.edit": "编辑分类与目录",
+        "organizer.autoOn": "自动识别中",
+        "organizer.loading": "正在读取整理设置…",
+        "organizer.loadError": "暂时无法读取整理设置。请重试。",
+        "organizer.autoCategories": "类型自动归类，规则由你补充",
+        "organizer.categoryHint": "新文件自动按类型归类。有文件的分类会自动出现；你可以改名、排序、隐藏，也可以添加自己的规则。",
+        "organizer.categoryName": "分类名称",
+        "organizer.showCategory": "显示分类",
+        "organizer.show": "显示",
+        "organizer.automatic": "自动识别",
+        "organizer.custom": "自定义规则",
+        "organizer.up": "上移",
+        "organizer.down": "下移",
+        "organizer.extensions": "扩展名（逗号分隔）",
+        "organizer.contains": "文件名包含",
+        "organizer.removeCategory": "移除这条分类规则",
+        "organizer.newCategory": "我的 PDF",
+        "organizer.addCategory": "添加自定义分类",
+        "organizer.autoDirectories": "自动发现工作区与会话目录",
+        "organizer.directoryHint": "自动跟随 DSH 的工作区和会话目录。你可以改显示名称、调整顺序、暂停收集，或补充一个目录。",
+        "organizer.directoryName": "目录显示名称",
+        "organizer.manual": "手动添加",
+        "organizer.unavailable": "暂时不可用",
+        "organizer.parentDisabled": "上级目录已暂停收集",
+        "organizer.collect": "收集",
+        "organizer.removeDirectory": "移出收集范围",
+        "organizer.noDirectories": "还没有发现目录，可以先添加一个。",
+        "organizer.addDirectory": "补充收集目录",
+        "organizer.directoryPath": "本机目录的绝对路径",
+        "organizer.directoryPlaceholder": "例如 /Users/你/项目 或 C:\\项目",
+        "organizer.add": "添加",
+        "organizer.filesSafe": "这里只调整浮窗的收集范围和显示名称，原文件与目录保持原样。",
+        "organizer.conflict": "设置已在另一处更新。请重新读取，再保存你的修改。",
+        "organizer.directoryError": "无法读取目录：{path}。请检查路径和访问权限。",
+        "organizer.ruleError": "请填写分类名称，以及扩展名或文件名关键词。",
+        "organizer.saveError": "没有保存成功，修改仍在这里。请重试。",
+        "organizer.reload": "重新读取",
+        "organizer.saving": "正在保存…",
+        "organizer.unsaved": "修改尚未保存",
+        "organizer.autoHint": "自动识别持续开启",
+        "organizer.reset": "恢复自动设置",
+        "organizer.cancel": "取消",
+        "organizer.save": "保存设置",
+        "organizer.saved": "分类与目录已更新",
+        "organizer.allDirectories": "全部目录",
+        "organizer.filterTypes": "按分类",
+        "organizer.filterDirectories": "按目录",
         'resize.title': '调整浮窗大小',
         'resize.hint': '拖动边缘或角落调整 · 方向键微调 · 双击或 Home 恢复尺寸',
         'resize.reset': '恢复默认大小',
@@ -698,6 +801,9 @@ window.__ModuleLoader__.load({
     const ICON_PATHS = {
       spark: 'M12 3.4l1.9 4.7 4.7 1.9-4.7 1.9L12 16.6l-1.9-4.7L5.4 10l4.7-1.9L12 3.4z',
       refresh: 'M20.5 12a8.5 8.5 0 1 1-2.5-6M20.5 4.5V11h-6.5',
+      up: 'M6 14.5l6-6 6 6',
+      edit: 'm15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15z',
+      check: 'm5 12 4 4L19 6',
       chevronDown: 'M6 9.5l6 6 6-6',
       send: 'M21.5 3.2L3.2 10.4l6.6 2.5 2.5 6.6L21.5 3.2zM9.8 12.9L20.4 3.3',
       close: 'M6.5 6.5l11 11M17.5 6.5l-11 11',
@@ -742,6 +848,8 @@ window.__ModuleLoader__.load({
       let snapshot = Object.freeze({
         status: 'idle',
         items: [],
+        roots: [],
+        organizer: null,
         stats: null,
         capabilities: { open: false, reveal: false, desktop: null },
         error: null,
@@ -820,6 +928,8 @@ window.__ModuleLoader__.load({
               status: 'ready',
               items,
               stats,
+              roots: loadVersion < mutationVersion ? snapshot.roots : payload?.roots || [],
+              organizer: loadVersion < mutationVersion ? snapshot.organizer : payload?.organizer || null,
               capabilities: payload?.capabilities ?? { open: false, reveal: false, desktop: null },
               error: null,
               loadedAt: Date.now(),
@@ -853,6 +963,15 @@ window.__ModuleLoader__.load({
           return () => listeners.delete(listener)
         },
         load: runLoad,
+        async refresh() {
+          if (request !== null) await request
+          return runLoad()
+        },
+        setOrganizer(value) {
+          mutationVersion += 1
+          publish({ organizer: { preferences: value.preferences, revision: value.revision, error: value.error },
+            roots: value.directories.filter((root) => root.enabled) })
+        },
         remove(path, token) {
           removedTokens.set(path, token)
           const items = snapshot.items.filter((item) => item.path !== path)
@@ -896,10 +1015,12 @@ window.__ModuleLoader__.load({
     function normalizeUiState(value) {
       const parsed = value !== null && typeof value === 'object' ? value : {}
       const filter = typeof parsed.filter === 'string' ? parsed.filter : 'all'
-      const allowed = filter === 'all' || filter === 'present' || KIND_FILTERS.includes(filter)
+      const allowed = filter === 'all' || filter === 'present' || KIND_FILTERS.includes(filter) || /^custom-[a-z0-9-]{1,80}$/.test(filter)
       return {
         collapsed: parsed.collapsed === true,
         filter: allowed ? filter : 'all',
+        filterMode: parsed.filterMode === 'directories' ? 'directories' : 'categories',
+        directory: typeof parsed.directory === 'string' ? parsed.directory.slice(0, 4096) : null,
         right: Number.isFinite(parsed.right) ? parsed.right : null,
         top: Number.isFinite(parsed.top) ? parsed.top : null,
         size: Number.isFinite(parsed.size?.width) && parsed.size.width > 0 && Number.isFinite(parsed.size?.height) && parsed.size.height > 0
@@ -1042,6 +1163,191 @@ window.__ModuleLoader__.load({
       return h('span', { className: 'rd-now' },
         showClock ? h('time', { dateTime: new Date(now).toISOString(), title: `${t('clock.label')} · ${Intl.DateTimeFormat().resolvedOptions().timeZone}`, 'aria-label': `${t('clock.label')} ${localClock(now, activeLanguage)}` }, localClock(now, activeLanguage)) : null,
         showWeather ? h('span', { className: 'rd-weather-emoji', role: 'img', 'aria-label': label, title: `${label} · Open-Meteo`, 'data-stale': Boolean(data?.stale) }, symbol ? symbol.emoji : '…') : null)
+    }
+
+    function blankOrganizer() {
+      return { categories: { names: [], hidden: [], order: [], custom: [] }, directories: { extra: [], disabled: [], names: [], order: [] } }
+    }
+
+    function matchesCategory(item, filter) {
+      if (!filter || filter.key === 'all') return true
+      if (filter.key === 'present') return item.origin === 'present'
+      if (!filter.custom) return item.kind === filter.key
+      const ext = String(item.ext || item.name?.split('.').pop() || '').toLowerCase()
+      return (!filter.custom.extensions.length || filter.custom.extensions.includes(ext)) &&
+        (!filter.custom.contains || String(item.name || '').toLowerCase().includes(filter.custom.contains.toLowerCase()))
+    }
+
+    function inDirectory(item, directory) {
+      if (!directory) return true
+      const clean = (value) => String(value || '').replace(/\\/g, '/').replace(/\/+$/, '') || '/'
+      let path = clean(item.path), root = clean(directory)
+      if (/^[A-Za-z]:/.test(root) || root.startsWith('//')) { path = path.toLowerCase(); root = root.toLowerCase() }
+      return root === '/' ? path.startsWith('/') : path === root || path.startsWith(root + '/')
+    }
+
+    function categoryFilters(items, preferences, includeEmpty = false) {
+      const config = preferences?.categories || blankOrganizer().categories
+      const names = new Map(config.names.map((item) => [item.id, item.label]))
+      const ranks = new Map(config.order.map((id, index) => [id, index]))
+      return ['all', 'present', ...KIND_FILTERS].map((key) => ({ key, label: names.get(key) || t(key === 'all' ? 'filter.all' : key === 'present' ? 'filter.present' : `kind.${key}`) }))
+        .concat(config.custom.map((custom) => ({ key: custom.id, label: names.get(custom.id) || custom.name, custom })))
+        .map((filter, index) => ({ ...filter, defaultRank: index, count: items.filter((item) => matchesCategory(item, filter)).length }))
+        .filter((filter) => includeEmpty || (!config.hidden.includes(filter.key) && (filter.count > 0 || filter.key === 'all' || filter.custom)))
+        .sort((a, b) => (ranks.get(a.key) ?? (1000 + a.defaultRank)) - (ranks.get(b.key) ?? (1000 + b.defaultRank)))
+    }
+
+    function movedEntry(values, value, delta) {
+      const next = [...values], index = next.indexOf(value), target = index + delta
+      if (index >= 0 && target >= 0 && target < next.length) [next[index], next[target]] = [next[target], next[index]]
+      return next
+    }
+
+    function OrganizerEditor({ initialTab, items, onClose, onSaved }) {
+      const [tab, setTab] = React.useState(initialTab)
+      const [data, setData] = React.useState(null)
+      const [draft, setDraft] = React.useState(blankOrganizer)
+      const [phase, setPhase] = React.useState('loading')
+      const [error, setError] = React.useState(null)
+      const [newPath, setNewPath] = React.useState('')
+      const dialogRef = React.useRef(null)
+      const alive = React.useRef(true)
+      const busy = phase === 'saving'
+      const clone = (value) => JSON.parse(JSON.stringify(value))
+      const load = async () => {
+        setPhase('loading'); setError(null)
+        try {
+          const response = await fetch(ORGANIZER_URL, { credentials: 'same-origin', cache: 'no-store' })
+          const value = await response.json()
+          if (!response.ok || value.error || !value.preferences) throw new Error('organizer.loadError')
+          if (!alive.current) return
+          setData(value); setDraft(clone(value.preferences)); setNewPath(''); setPhase('ready')
+        } catch { if (alive.current) { setError(t('organizer.loadError')); setPhase('error') } }
+      }
+      React.useEffect(() => { alive.current = true; void load(); return () => { alive.current = false } }, [])
+      React.useEffect(() => {
+        const previous = document.activeElement
+        dialogRef.current?.querySelector('[role="tab"][aria-selected="true"]')?.focus()
+        return () => { if (previous?.isConnected) previous.focus?.() }
+      }, [])
+      React.useEffect(() => {
+        const key = (event) => {
+          if (event.key === 'Escape') { event.stopPropagation(); event.preventDefault(); if (!busy) onClose(); return }
+          if (event.key !== 'Tab') return
+          const controls = [...(dialogRef.current?.querySelectorAll('button,input,textarea,select,[tabindex="0"]') || [])].filter((node) => !node.disabled && node.getClientRects().length)
+          const first = controls[0], last = controls[controls.length - 1]
+          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+        }
+        window.addEventListener('keydown', key, true)
+        return () => window.removeEventListener('keydown', key, true)
+      }, [busy, onClose])
+      const edit = (action) => setDraft((current) => { const next = clone(current); action(next); return next })
+      const setName = (id, label) => edit((next) => {
+        next.categories.names = next.categories.names.filter((item) => item.id !== id).concat({ id, label })
+        const custom = next.categories.custom.find((item) => item.id === id)
+        if (custom) custom.name = label
+      })
+      const setDirectoryName = (path, label) => edit((next) => { next.directories.names = next.directories.names.filter((item) => item.path !== path).concat({ path, label }) })
+      const addPath = () => {
+        const path = newPath.trim()
+        if (!path) return
+        edit((next) => { if (!next.directories.extra.includes(path)) next.directories.extra.push(path) })
+        setNewPath(''); setError(null)
+      }
+      const save = async () => {
+        if (phase !== 'ready' || !data) return
+        const preferences = clone(draft)
+        if (newPath.trim() && !preferences.directories.extra.includes(newPath.trim())) preferences.directories.extra.push(newPath.trim())
+        setPhase('saving'); setError(null)
+        try {
+          const response = await fetch(ORGANIZER_URL, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ preferences, revision: data.revision }) })
+          const value = await response.json()
+          if (!response.ok) {
+            const key = value.error === 'organizer-conflict' ? 'organizer.conflict' :
+              ['directory-unavailable', 'invalid-directory'].includes(value.error) ? 'organizer.directoryError' :
+              ['invalid-category', 'empty-category-rule', 'invalid-extension'].includes(value.error) ? 'organizer.ruleError' : 'organizer.saveError'
+            setError(t(key, { path: value.path || '' })); setPhase('ready'); return
+          }
+          await onSaved(value)
+          if (alive.current) onClose()
+        } catch { if (alive.current) { setError(t('organizer.saveError')); setPhase('ready') } }
+      }
+      const filters = categoryFilters(items, draft, true)
+      const ranks = new Map(draft.directories.order.map((path, index) => [path, index]))
+      const known = new Map((data?.directories || []).map((root) => [root.path, root]))
+      const roots = [...(data?.directories || []).filter((root) => root.source !== 'manual'),
+        ...draft.directories.extra.map((path) => known.get(path) || { path, label: path.split(/[/\\]/).filter(Boolean).pop() || path, source: 'manual', available: true })]
+        .filter((root, index, all) => all.findIndex((item) => item.path === root.path) === index)
+        .sort((a, b) => (ranks.get(a.path) ?? 100000) - (ranks.get(b.path) ?? 100000))
+      const dirty = data && (JSON.stringify(data.preferences) !== JSON.stringify(draft) || Boolean(newPath.trim()))
+      const reorderCategory = (id, delta) => edit((next) => { next.categories.order = movedEntry(filters.map((filter) => filter.key), id, delta) })
+      const reorderDirectory = (path, delta) => edit((next) => { next.directories.order = movedEntry(roots.map((root) => root.path), path, delta) })
+      const iconButton = (name, label, action, disabled = false) => h('button', { type: 'button', className: 'rd-editor-icon', title: label, 'aria-label': label, disabled: busy || disabled, onClick: action }, h(Icon, { name, size: 14 }))
+      return h('div', { className: 'rd-editor-backdrop', onPointerDown: (event) => { if (event.target === event.currentTarget && !busy) onClose() } },
+        h('section', { className: 'rd-editor', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'rd-organizer-title', ref: dialogRef },
+          h('div', { className: 'rd-editor-cap', 'aria-hidden': 'true' }),
+          h('header', { className: 'rd-editor-head' },
+            h('span', { className: 'rd-editor-orb' }, h(Icon, { name: 'stack', size: 23 })),
+            h('div', { className: 'rd-editor-heading' }, h('h2', { id: 'rd-organizer-title' }, t('organizer.title')), h('p', null, t('organizer.subtitle'))),
+            iconButton('close', t('close'), onClose)),
+          h('div', { className: 'rd-editor-navigation' },
+            h('div', { className: 'rd-editor-tabs', role: 'tablist', 'aria-label': t('organizer.title') },
+              [['categories', t('organizer.categories')], ['directories', t('organizer.directories')]].map(([key, name]) => h('button', { key, type: 'button', role: 'tab', id: `rd-editor-tab-${key}`, 'aria-selected': tab === key, 'aria-controls': 'rd-editor-content', disabled: busy, onClick: () => setTab(key) }, name))),
+            h('span', { className: 'rd-editor-auto' }, h(Icon, { name: 'spark', size: 12 }), t('organizer.autoOn'))),
+          h('div', { className: 'rd-editor-body', id: 'rd-editor-content', role: 'tabpanel', 'aria-labelledby': `rd-editor-tab-${tab}`, 'aria-busy': busy },
+            phase === 'loading' ? h('div', { className: 'rd-editor-loading', role: 'status' }, h('span', { className: 'rd-spinner' }), t('organizer.loading')) :
+              !data ? h('div', { className: 'rd-editor-loading', role: 'alert' }, error, h('button', { type: 'button', className: 'rd-btn', onClick: load }, t('retry'))) :
+              tab === 'categories' ? h(React.Fragment, null,
+                h('div', { className: 'rd-editor-intro' }, h('h3', null, t('organizer.autoCategories')), h('p', null, t('organizer.categoryHint'))),
+                h('div', { className: 'rd-editor-cards' }, filters.map((filter, index) => {
+                  const name = draft.categories.names.find((item) => item.id === filter.key)?.label ?? filter.label
+                  return h('div', { className: 'rd-editor-card', key: filter.key },
+                    h('div', { className: 'rd-editor-card-row' },
+                      h('span', { className: 'rd-editor-type', style: { '--rd-hue': KIND_COLOR[filter.key] || KIND_COLOR.other } }, filter.custom ? '＋' : KIND_CODE[filter.key] || 'ALL'),
+                      h('div', { className: 'rd-editor-card-main' },
+                        h('input', { type: 'text', className: 'rd-editor-name', maxLength: 48, disabled: busy, value: name, 'aria-label': `${t('organizer.categoryName')} — ${filter.key}`, onChange: (event) => setName(filter.key, event.target.value) }),
+                        h('span', { className: 'rd-editor-caption' }, t(filter.custom ? 'organizer.custom' : 'organizer.automatic'), ' · ', t('footer.count', { n: filter.count }))),
+                      h('label', { className: 'rd-editor-toggle-label' }, h('input', { type: 'checkbox', className: 'rd-editor-switch', disabled: busy || filter.key === 'all', checked: !draft.categories.hidden.includes(filter.key),
+                        'aria-label': `${t('organizer.showCategory')} — ${filter.key}`, onChange: (event) => edit((next) => { next.categories.hidden = next.categories.hidden.filter((id) => id !== filter.key); if (!event.target.checked) next.categories.hidden.push(filter.key) }) }), t('organizer.show')),
+                      h('div', { className: 'rd-editor-order' }, iconButton('up', `${t('organizer.up')} — ${filter.key}`, () => reorderCategory(filter.key, -1), index === 0), iconButton('chevronDown', `${t('organizer.down')} — ${filter.key}`, () => reorderCategory(filter.key, 1), index === filters.length - 1))),
+                    filter.custom ? h('div', { className: 'rd-editor-rules' },
+                      h('label', null, t('organizer.extensions'), h('input', { type: 'text', className: 'rd-editor-field', disabled: busy, value: filter.custom.extensionsText ?? filter.custom.extensions.join(', '), 'aria-label': `${t('organizer.extensions')} — ${filter.key}`, placeholder: 'pdf, docx',
+                        onChange: (event) => edit((next) => { const custom = next.categories.custom.find((item) => item.id === filter.key); custom.extensionsText = event.target.value; custom.extensions = event.target.value.split(/[,，\s]+/).map((ext) => ext.replace(/^\./, '').toLowerCase()).filter(Boolean) }) })),
+                      h('label', null, t('organizer.contains'), h('input', { type: 'text', className: 'rd-editor-field', disabled: busy, value: filter.custom.contains, maxLength: 120, 'aria-label': `${t('organizer.contains')} — ${filter.key}`, onChange: (event) => edit((next) => { next.categories.custom.find((item) => item.id === filter.key).contains = event.target.value }) })),
+                      h('button', { type: 'button', className: 'rd-link', disabled: busy, onClick: () => edit((next) => { next.categories.custom = next.categories.custom.filter((item) => item.id !== filter.key); next.categories.names = next.categories.names.filter((item) => item.id !== filter.key); next.categories.order = next.categories.order.filter((id) => id !== filter.key); next.categories.hidden = next.categories.hidden.filter((id) => id !== filter.key) }) }, t('organizer.removeCategory'))) : null)
+                })),
+                h('button', { type: 'button', className: 'rd-editor-add', disabled: busy, onClick: () => edit((next) => { next.categories.custom.push({ id: `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`, name: t('organizer.newCategory'), extensions: ['pdf'], contains: '' }) }) }, '+ ', t('organizer.addCategory'))) :
+                h(React.Fragment, null,
+                  h('div', { className: 'rd-editor-intro' }, h('h3', null, t('organizer.autoDirectories')), h('p', null, t('organizer.directoryHint'))),
+                  h('div', { className: 'rd-editor-cards' }, roots.map((root, index) => {
+                    const name = draft.directories.names.find((item) => item.path === root.path)?.label ?? root.autoLabel ?? root.label
+                    const inherited = draft.directories.disabled.some((path) => path !== root.path && inDirectory({ path: root.path }, path))
+                    const enabled = !root.profileBlocked && !inherited && !draft.directories.disabled.includes(root.path)
+                    return h('div', { className: 'rd-editor-card', key: root.path },
+                      h('div', { className: 'rd-editor-card-row' },
+                        h('span', { className: 'rd-editor-type' }, h(Icon, { name: 'folder', size: 18 })),
+                        h('div', { className: 'rd-editor-card-main' },
+                          h('input', { type: 'text', className: 'rd-editor-name', maxLength: 64, disabled: busy, value: name, 'aria-label': `${t('organizer.directoryName')} — ${root.path}`, onChange: (event) => setDirectoryName(root.path, event.target.value) }),
+                          h('span', { className: 'rd-editor-caption' }, t(root.source === 'manual' ? 'organizer.manual' : 'organizer.automatic'), root.available === false ? ` · ${t('organizer.unavailable')}` : '', inherited ? ` · ${t('organizer.parentDisabled')}` : '')),
+                        h('label', { className: 'rd-editor-toggle-label' }, h('input', { type: 'checkbox', className: 'rd-editor-switch', disabled: busy || inherited || root.profileBlocked, checked: enabled, 'aria-label': `${t('organizer.collect')} — ${root.path}`,
+                          onChange: (event) => edit((next) => { next.directories.disabled = next.directories.disabled.filter((path) => path !== root.path); if (!event.target.checked) next.directories.disabled.push(root.path) }) }), t('organizer.collect')),
+                        h('div', { className: 'rd-editor-order' }, iconButton('up', `${t('organizer.up')} — ${root.path}`, () => reorderDirectory(root.path, -1), index === 0), iconButton('chevronDown', `${t('organizer.down')} — ${root.path}`, () => reorderDirectory(root.path, 1), index === roots.length - 1))),
+                      h('p', { className: 'rd-editor-path' }, root.path),
+                      root.source === 'manual' ? h('button', { type: 'button', className: 'rd-link', disabled: busy, onClick: () => edit((next) => { next.directories.extra = next.directories.extra.filter((path) => path !== root.path); next.directories.names = next.directories.names.filter((item) => item.path !== root.path); next.directories.disabled = next.directories.disabled.filter((path) => path !== root.path) }) }, t('organizer.removeDirectory')) : null)
+                  })),
+                  roots.length === 0 ? h('p', { className: 'rd-editor-note' }, t('organizer.noDirectories')) : null,
+                  h('label', { className: 'rd-editor-path-add' }, t('organizer.addDirectory'), h('span', { className: 'rd-editor-path-form' },
+                    h('input', { type: 'text', className: 'rd-editor-field', disabled: busy, value: newPath, 'aria-label': t('organizer.directoryPath'), placeholder: t('organizer.directoryPlaceholder'), onChange: (event) => setNewPath(event.target.value), onKeyDown: (event) => { if (event.key === 'Enter') { event.preventDefault(); addPath() } } }),
+                    h('button', { type: 'button', className: 'rd-btn', disabled: busy || !newPath.trim(), onClick: addPath }, t('organizer.add')))),
+                  h('p', { className: 'rd-editor-note' }, t('organizer.filesSafe')))),
+          error && data ? h('div', { className: 'rd-editor-error', role: 'alert' }, error, h('button', { type: 'button', className: 'rd-link', disabled: busy, onClick: load }, t('organizer.reload'))) : null,
+          h('footer', { className: 'rd-editor-footer' },
+            h('span', { className: 'rd-editor-save-state', role: 'status' }, t(busy ? 'organizer.saving' : dirty ? 'organizer.unsaved' : 'organizer.autoHint')),
+            h('button', { type: 'button', className: 'rd-link', disabled: busy || !data, onClick: () => { setDraft(blankOrganizer()); setNewPath(''); setError(null) } }, t('organizer.reset')),
+            h('button', { type: 'button', className: 'rd-btn', disabled: busy, onClick: onClose }, t('organizer.cancel')),
+            h('button', { type: 'button', className: 'rd-btn rd-editor-save', disabled: phase !== 'ready' || !data, onClick: save }, busy ? h('span', { className: 'rd-spinner' }) : h(Icon, { name: 'check', size: 14 }), t(busy ? 'organizer.saving' : 'organizer.save')))))
     }
 
     function Character({ avatar, size = 20 }) {
@@ -1270,6 +1576,94 @@ window.__ModuleLoader__.load({
 @keyframes rd-pop{from{opacity:0;transform:translateY(8px) scale(.99)}to{opacity:1;transform:none}}
 @keyframes rd-spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.rd-panel,.rd-backdrop,.rd-modal,.rd-toast{animation:none}.rd-pill:hover{transform:none}.rd-spinner,.rd-icon[data-spinning="true"] svg{animation-duration:2.4s}}
+/* Reflow the complete text into the available row width. */
+.rd-row{display:grid;grid-template-columns:minmax(0,1fr) 27px;gap:3px 8px;align-items:start}
+.rd-main{grid-column:1;grid-row:1;align-items:flex-start}
+.rd-tile{margin-top:3px}
+.rd-name{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.5}
+.rd-name-line{align-items:flex-start;flex-wrap:wrap;gap:3px 6px}
+.rd-name-button{flex:1 1 110px;font-size:12px;font-weight:520}
+.rd-badge{flex:none;white-space:nowrap;min-width:max-content;display:inline-flex;line-height:16px;margin-top:1px}
+.rd-meta{display:block;white-space:normal;overflow:visible;overflow-wrap:anywhere;line-height:1.55}
+.rd-meta-part:not(:first-child)::before{content:' · ';white-space:pre;opacity:.65}
+.rd-desc{display:block;white-space:normal;overflow:visible;overflow-wrap:anywhere;-webkit-line-clamp:unset}
+.rd-actions{grid-column:1;grid-row:2;margin-left:38px;opacity:.55;height:20px}
+.rd-delete{grid-column:2;grid-row:1;margin:3px 0 0;align-self:start}
+.rd-check{top:13.5px;transform:none}
+.rd-root-link{border:0;padding:0;background:transparent;color:inherit;font:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:3px;text-decoration-color:color-mix(in srgb,currentColor 30%,transparent)}
+.rd-root-link:hover{color:var(--rd-accent)}
+.rd-filter-top{display:flex;align-items:center;justify-content:space-between;gap:7px;min-width:0}
+.rd-filter-modes{display:inline-flex;flex:none;gap:1px;padding:2px;background:var(--rd-canvas);border:1px solid var(--rd-line);border-radius:999px}
+.rd-filter-modes button{border:0;background:transparent;color:var(--rd-ink-3);font:inherit;font-size:9.5px;padding:3px 7px;border-radius:999px;cursor:pointer;white-space:nowrap}
+.rd-filter-modes button[aria-pressed='true']{background:var(--rd-chip);color:var(--rd-ink)}
+.rd-filter-edit{min-width:0;display:inline-flex;align-items:center;gap:4px;border:0;padding:3px 0;background:transparent;color:var(--rd-ink-3);font:inherit;font-size:9.5px;cursor:pointer;text-align:right}
+.rd-filter-edit svg{flex:none}
+.rd-filter-edit:hover{color:var(--rd-accent)}
+.rd-root .rd-filter-top button:focus-visible,.rd-root-link:focus-visible{outline:2px solid var(--rd-accent);outline-offset:2px}
+/* The editor opens as a separate soft capsule above the file panel. */
+.rd-editor-backdrop{position:fixed;inset:0;z-index:120;display:grid;place-items:center;box-sizing:border-box;padding:24px;background:#100e0b70;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:rd-editor-shade .22s ease both}
+.rd-editor{position:relative;box-sizing:border-box;display:flex;flex-direction:column;width:min(610px,100%);max-height:min(780px,calc(100dvh - 48px));overflow:hidden;border-radius:30px;border:1px solid color-mix(in srgb,var(--rd-line) 90%,var(--rd-ink) 10%);background:linear-gradient(155deg,color-mix(in srgb,var(--rd-accent) 6%,var(--rd-surface)),var(--rd-surface) 42%);box-shadow:0 32px 90px #0005,0 1px 0 #ffffff0d inset;animation:rd-editor-open .4s cubic-bezier(.2,.85,.23,1) both;transform-origin:70% 12%;color:var(--rd-ink);font-size:12px;line-height:1.5}
+.rd-editor-cap{position:absolute;width:34px;height:3px;top:10px;left:calc(50% - 17px);border-radius:99px;background:color-mix(in srgb,var(--rd-ink-3) 30%,transparent)}
+.rd-editor-head{display:flex;align-items:center;gap:12px;padding:28px 24px 22px}
+.rd-editor-heading{flex:1;min-width:0}
+.rd-editor-heading h2{font:600 19px/1.4 var(--dsw-font-family,inherit);letter-spacing:-.025em;margin:0 0 4px}
+.rd-editor-heading p{font-size:11px;color:var(--rd-ink-3);margin:0}
+.rd-editor-orb{width:44px;height:44px;display:grid;place-items:center;flex:none;border-radius:16px;color:var(--rd-accent);background:linear-gradient(135deg,color-mix(in srgb,var(--rd-accent) 22%,transparent),color-mix(in srgb,var(--rd-accent) 7%,transparent));border:1px solid color-mix(in srgb,var(--rd-accent) 20%,transparent);box-shadow:0 5px 15px #0001}
+.rd-editor-navigation{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 24px 15px}
+.rd-editor-tabs{display:inline-flex;gap:3px;padding:4px;border:1px solid var(--rd-line);background:var(--rd-canvas);border-radius:999px}
+.rd-editor-tabs button{border:0;background:none;border-radius:999px;color:var(--rd-ink-3);padding:7px 18px;font:inherit;font-size:11px;cursor:pointer;transition:background .2s,color .2s}
+.rd-editor-tabs button[aria-selected='true']{background:var(--rd-chip);color:var(--rd-ink);box-shadow:0 1px 4px #0001}
+.rd-editor-auto{display:inline-flex;gap:5px;align-items:center;font-size:10px;color:var(--rd-accent);white-space:nowrap}
+.rd-editor-body{padding:0 24px 22px;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--rd-line) transparent}
+.rd-editor-intro{padding:4px 0 15px}
+.rd-editor-intro h3{font-size:12px;font-weight:600;margin:0 0 5px}
+.rd-editor-intro p,.rd-editor-note{font-size:10.5px;line-height:1.75;color:var(--rd-ink-3);margin:0}
+.rd-editor-cards{display:flex;flex-direction:column;gap:8px}
+.rd-editor-card{padding:12px;border-radius:15px;background:color-mix(in srgb,var(--rd-canvas) 70%,transparent);border:1px solid var(--rd-line);min-width:0}
+.rd-editor-card-row{display:flex;align-items:center;gap:9px;min-width:0}
+.rd-editor-type{flex:none;display:grid;place-items:center;box-sizing:border-box;width:31px;height:34px;border-radius:10px;font:650 8px/1 ui-monospace,monospace;color:var(--rd-hue,var(--rd-accent));background:color-mix(in srgb,var(--rd-hue,var(--rd-accent)) 12%,transparent)}
+.rd-editor-card-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.rd-editor-name{box-sizing:border-box;min-width:0;width:100%;font:inherit;font-size:12px;color:var(--rd-ink);border:1px solid transparent;border-radius:5px;background:transparent;padding:2px 3px;outline:none}
+.rd-editor-name:hover{background:var(--rd-hover)}
+.rd-editor-name:focus{background:var(--rd-surface);border-color:var(--rd-accent)}
+.rd-editor-caption{color:var(--rd-ink-3);font-size:9px;padding-left:4px}
+.rd-editor-toggle-label{display:flex;align-items:center;gap:6px;flex:none;font-size:10px;color:var(--rd-ink-3);cursor:pointer}
+.rd-editor-switch{appearance:none;box-sizing:border-box;position:relative;flex:none;margin:0;width:28px;height:17px;border:1px solid var(--rd-line);border-radius:99px;background:var(--rd-chip);cursor:pointer;transition:background .2s}
+.rd-editor-switch:before{content:'';display:block;position:absolute;width:11px;height:11px;left:2px;top:2px;background:var(--rd-ink-3);border-radius:50%;transition:transform .2s}
+.rd-editor-switch:checked{background:var(--rd-accent);border-color:var(--rd-accent)}
+.rd-editor-switch:checked:before{background:#fff6ec;transform:translateX(11px)}
+.rd-editor-switch:disabled{opacity:.4;cursor:default}
+.rd-editor-order{display:flex;gap:0;flex:none}
+.rd-editor-icon{display:grid;place-items:center;flex:none;width:26px;height:28px;border:0;border-radius:8px;background:transparent;color:var(--rd-ink-3);cursor:pointer}
+.rd-editor-icon:hover{background:var(--rd-hover);color:var(--rd-ink)}
+.rd-editor button:disabled{opacity:.4;cursor:default}
+.rd-editor button:focus-visible,.rd-editor-switch:focus-visible{outline:2px solid var(--rd-accent);outline-offset:2px}
+.rd-editor-path{font:10px/1.6 ui-monospace,monospace;color:var(--rd-ink-3);overflow-wrap:anywhere;white-space:normal;margin:10px 3px 0}
+.rd-editor-card>.rd-link{margin:10px 3px 0;font-size:10px}
+.rd-editor-rules{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;padding:12px 3px 2px}
+.rd-editor-rules label,.rd-editor-path-add{display:flex;flex-direction:column;gap:7px;font-size:10px;color:var(--rd-ink-3);min-width:0}
+.rd-editor-rules>.rd-link{grid-column:1/-1;justify-self:start}
+.rd-editor-field{box-sizing:border-box;width:100%;min-width:0;height:33px;border-radius:8px;border:1px solid var(--rd-line);background:var(--rd-surface);color:var(--rd-ink);font:inherit;font-size:11px;padding:0 9px;outline:none}
+.rd-editor-field:focus{border-color:var(--rd-accent)}
+.rd-editor-field::placeholder{color:var(--rd-ink-3);opacity:.7}
+.rd-editor-path-add{margin:18px 0 12px}
+.rd-editor-path-form{display:flex;align-items:center;gap:7px}
+.rd-editor-path-form .rd-btn{height:33px;padding:0 14px}
+.rd-editor-add{width:100%;margin-top:10px;padding:12px;border:1px dashed color-mix(in srgb,var(--rd-accent) 35%,var(--rd-line));border-radius:14px;background:transparent;color:var(--rd-accent);font:inherit;font-size:11px;cursor:pointer}
+.rd-editor-add:hover{background:color-mix(in srgb,var(--rd-accent) 5%,transparent)}
+.rd-editor-loading{min-height:180px;display:flex;justify-content:center;align-items:center;gap:10px;color:var(--rd-ink-3);flex-wrap:wrap}
+.rd-editor-error{flex:none;max-height:90px;overflow:auto;font-size:11px;line-height:1.7;padding:10px 24px;color:var(--rd-accent);border-top:1px solid var(--rd-line);overflow-wrap:anywhere}
+.rd-editor-error .rd-link{margin-left:8px;font-size:10px}
+.rd-editor-footer{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;padding:16px 24px 20px;border-top:1px solid var(--rd-line);background:color-mix(in srgb,var(--rd-canvas) 55%,transparent)}
+.rd-editor-save-state{flex:1;font-size:10px;color:var(--rd-ink-3);min-width:90px}
+.rd-editor-footer .rd-link{font-size:10px}
+.rd-editor-footer .rd-btn{min-height:31px;padding:6px 12px;font-size:11px}
+.rd-editor-save{background:var(--rd-accent);color:#251b16;border-color:transparent;display:inline-flex;gap:6px;align-items:center;justify-content:center}
+@keyframes rd-editor-open{from{opacity:0;transform:translateY(-12px) scale(.92);border-radius:70px}to{opacity:1;transform:translateY(0) scale(1);border-radius:30px}}
+@keyframes rd-editor-shade{from{background:#100e0b00;backdrop-filter:blur(0)}to{background:#100e0b70;backdrop-filter:blur(8px)}}
+@media(max-width:480px){.rd-editor-backdrop{padding:10px}.rd-editor{max-height:calc(100dvh - 20px);border-radius:24px}.rd-editor-head{padding:24px 16px 16px;gap:9px}.rd-editor-heading h2{font-size:17px}.rd-editor-heading p{font-size:10px}.rd-editor-navigation{margin:0 16px 12px;gap:5px}.rd-editor-tabs button{padding:6px 12px}.rd-editor-auto{font-size:9px}.rd-editor-body{padding:0 16px 16px}.rd-editor-card{padding:10px}.rd-editor-card-row{gap:5px}.rd-editor-type{width:25px;font-size:7px}.rd-editor-toggle-label{font-size:0;gap:0}.rd-editor-icon{width:22px}.rd-editor-rules{grid-template-columns:1fr}.rd-editor-footer{padding:12px 16px 16px;gap:8px}.rd-editor-save-state{flex-basis:100%}.rd-editor-error{padding:10px 16px}}
+@media(prefers-reduced-motion:reduce){.rd-editor,.rd-editor-backdrop{animation:none!important}.rd-editor-switch,.rd-editor-switch:before{transition:none}}
+
 @media (max-width:640px){.rd-root{right:10px}.rd-panel{width:var(--rd-panel-width,min(336px,calc(100vw - 20px)))}}
 `
 
@@ -1280,6 +1674,7 @@ window.__ModuleLoader__.load({
     function Panel() {
       const [snapshot, setSnapshot] = React.useState(store.get)
       const [ui, setUi] = React.useState(loadUiState)
+      const [organizerTab, setOrganizerTab] = React.useState(null)
       const [settingsOpen, setSettingsOpen] = React.useState(false)
       const [avatarLoading, setAvatarLoading] = React.useState(false)
       const avatarFileRef = React.useRef(null)
@@ -1360,7 +1755,7 @@ window.__ModuleLoader__.load({
         }
       }, [ui.collapsed])
 
-      React.useEffect(() => setRowLimit(ROW_BATCH), [ui.filter, query])
+      React.useEffect(() => setRowLimit(ROW_BATCH), [ui.filter, ui.directory, ui.filterMode, query])
 
       // Capture observes outside clicks without cancelling the underlying action.
       React.useEffect(() => {
@@ -1370,6 +1765,7 @@ window.__ModuleLoader__.load({
           setUi((current) => ({ ...current, collapsed: true }))
           saveUiState({ collapsed: true })
           setSettingsOpen(false)
+          setOrganizerTab(null)
           forwardToken.current += 1
           setForward(null)
           setRemoving(null)
@@ -1714,6 +2110,7 @@ window.__ModuleLoader__.load({
         saveUiState({ collapsed: next })
         if (next) {
           setSettingsOpen(false)
+          setOrganizerTab(null)
           forwardToken.current += 1
           setForward(null)
         } else {
@@ -1721,9 +2118,14 @@ window.__ModuleLoader__.load({
         }
       }
 
-      const selectFilter = (filter) => {
-        setUi({ ...ui, filter })
-        saveUiState({ filter })
+      const selectFilter = (filter) => updatePreference(ui.filterMode === 'directories' ? { directory: filter || null } : { filter })
+      const switchFilterMode = (filterMode) => updatePreference({ filterMode, filter: 'all', directory: null })
+      const openOrganizer = (tab) => { setSettingsOpen(false); setOrganizerTab(tab) }
+      const saveOrganizer = async (value) => {
+        store.setOrganizer(value)
+        updatePreference({ filter: 'all', directory: null })
+        await store.refresh()
+        showToast(t('organizer.saved'))
       }
 
       /**
@@ -2105,24 +2507,20 @@ window.__ModuleLoader__.load({
         counts.byKind[item.kind] = (counts.byKind[item.kind] || 0) + 1
       }
 
+      const categories = categoryFilters(items, snapshot.organizer?.preferences)
+      const activeCategory = categories.find((filter) => filter.key === ui.filter) || categories.find((filter) => filter.key === 'all')
+      const directories = [{ key: '', label: t('organizer.allDirectories'), count: items.length },
+        ...(snapshot.roots || []).map((root) => ({ key: root.path, label: root.label,
+          count: items.filter((item) => inDirectory(item, root.path)).length }))]
+      const directory = directories.some((root) => root.key === ui.directory) ? ui.directory : null
       const normalizedQuery = query.trim().toLowerCase()
       const visible = items.filter((item) => {
-        if (ui.filter === 'present' && item.origin !== 'present') return false
-        if (ui.filter !== 'all' && ui.filter !== 'present' && item.kind !== ui.filter) return false
+        if (ui.filterMode === 'directories' ? !inDirectory(item, directory) : !matchesCategory(item, activeCategory)) return false
         if (normalizedQuery.length === 0) return true
         const haystack = `${item.name} ${item.description || ''} ${item.sessionTitle || ''} ${item.rootLabel || ''}`.toLowerCase()
         return haystack.includes(normalizedQuery)
       })
-
-      const filters = [
-        { key: 'all', label: t('filter.all'), count: counts.all },
-        ...(counts.present > 0 ? [{ key: 'present', label: t('filter.present'), count: counts.present }] : []),
-        ...KIND_FILTERS.filter((kind) => (counts.byKind[kind] || 0) > 0).map((kind) => ({
-          key: kind,
-          label: t(`kind.${kind}`),
-          count: counts.byKind[kind] || 0,
-        })),
-      ]
+      const filters = ui.filterMode === 'directories' ? directories : categories
 
       const stats = snapshot.stats
       const fresh = items.some((item) => Number.isFinite(item.mtime) && nowRef.current - item.mtime < FRESH_MS)
@@ -2191,7 +2589,7 @@ window.__ModuleLoader__.load({
         h('style', { key: 'rd-style' }, CSS),
         h(
           'section',
-          { className: 'rd-panel', role: 'region', 'aria-label': t('title'), ref: panelRef },
+          { className: 'rd-panel', role: 'region', 'aria-label': t('title'), ref: panelRef, inert: organizerTab !== null ? '' : undefined },
           h(
             'header',
             {
@@ -2274,6 +2672,12 @@ window.__ModuleLoader__.load({
                   onChange: (event) => setQuery(event.target.value),
                 }),
               ),
+              h('div', { className: 'rd-filter-top' },
+                h('div', { className: 'rd-filter-modes', role: 'group', 'aria-label': t('organizer.title') },
+                  ['categories', 'directories'].map((mode) => h('button', { type: 'button', key: mode,
+                    'aria-pressed': ui.filterMode === mode, onClick: () => switchFilterMode(mode) }, t(mode === 'categories' ? 'organizer.filterTypes' : 'organizer.filterDirectories')))),
+                h('button', { type: 'button', className: 'rd-filter-edit', title: t('organizer.edit'), 'aria-label': t('organizer.edit'),
+                  onClick: () => openOrganizer(ui.filterMode) }, h(Icon, { name: 'edit', size: 12 }), t('organizer.edit'))),
               h(
                 'div',
                 { className: 'rd-chips', role: 'group', 'aria-label': t('title') },
@@ -2284,7 +2688,7 @@ window.__ModuleLoader__.load({
                       key: filter.key,
                       type: 'button',
                       className: 'rd-chip',
-                      'aria-pressed': ui.filter === filter.key ? 'true' : 'false',
+                      'aria-pressed': (ui.filterMode === 'directories' ? (directory || '') === filter.key : activeCategory?.key === filter.key) ? 'true' : 'false',
                       onClick: () => selectFilter(filter.key),
                     },
                     filter.label,
@@ -2368,7 +2772,7 @@ window.__ModuleLoader__.load({
                   : [
                       t('footer.count', { n: stats?.shown ?? items.length }),
                       stats !== null && stats.roots > 0 ? h('span', { className: 'rd-dot', key: 'd1' }) : null,
-                      stats !== null && stats.roots > 0 ? t('footer.roots', { n: stats.roots }) : null,
+                      h('button', { type: 'button', className: 'rd-root-link', title: t('organizer.edit'), onClick: () => openOrganizer('directories') }, t('footer.roots', { n: stats?.roots || 0 })),
                     ],
               ),
               h(
@@ -2382,7 +2786,8 @@ window.__ModuleLoader__.load({
         ),
         toast !== null ? h('div', { className: 'rd-toast', role: 'status', key: 'toast' }, toast) : null,
         preview !== null ? renderPreview(preview) : null,
-        preview === null ? h('div', { className: 'rd-resize-layer', role: 'group', 'aria-label': t('resize.title') },
+        organizerTab !== null ? h(OrganizerEditor, { initialTab: organizerTab, items, onClose: () => setOrganizerTab(null), onSaved: saveOrganizer }) : null,
+        preview === null && organizerTab === null ? h('div', { className: 'rd-resize-layer', role: 'group', 'aria-label': t('resize.title') },
           ['n', 's', 'w', 'e', 'nw', 'ne', 'sw', 'se'].map((edge) => h('button', { type: 'button', key: edge,
             className: `rd-resize-handle rd-resize-${edge}`, 'aria-label': `${t('resize.title')} — ${t('resize.' + edge)}`,
             title: t('resize.hint'), onPointerDown: (event) => startResize(event, edge),
@@ -2492,8 +2897,7 @@ window.__ModuleLoader__.load({
                 item.origin === 'present' ? h('span', { className: 'rd-badge' }, t('origin.present')) : null),
               h('button', { type: 'button', className: 'rd-details', onClick: () => activate(item),
                 title: item.path, 'aria-label': `${item.name} — ${item.previewable === true ? t('preview') : t('open')}` },
-                h('span', { className: 'rd-meta' }, meta.map((part, partIndex) => h(React.Fragment, { key: partIndex },
-                  partIndex > 0 ? h('span', { className: 'rd-dot', 'aria-hidden': 'true' }) : null, h('span', null, part)))),
+                h('span', { className: 'rd-meta' }, meta.map((part, partIndex) => h('span', { key: partIndex, className: 'rd-meta-part' }, part))),
                 item.description ? h('span', { className: 'rd-desc' }, item.description) : null))),
           h(
             'span',

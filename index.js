@@ -1,7 +1,7 @@
 /**
  * Recent Deliverables — Host half.
  *
- * Owns seven authenticated Fetch routes inside Connection's authentication
+ * Owns eight authenticated Fetch routes inside Connection's authentication
  * fence:
  *
  *   GET  /api/recent-deliverables.list   the merged, newest-first deliverable list
@@ -11,6 +11,7 @@
  *   POST /api/recent-deliverables.delete-batch move a validated selection to OS trash
  *   POST /api/recent-deliverables.rename rename without replacing an existing entry
  *   GET  /api/recent-deliverables.weather optional, cached approximate-city weather
+ *   GET/POST /api/recent-deliverables.organizer automatic/manual organization
  *
  * The list has two sources:
  *
@@ -33,6 +34,7 @@ import { readdir, realpath, stat, lstat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import trash from 'trash'
 import { createWeatherService } from './weather.js'
+import { createOrganizerStore, directoryPath } from './organizer.js'
 import { join, dirname } from 'node:path'
 import { homedir } from 'node:os'
 import { validFileName, entryKey, prepareRename, loadAliases, saveAliases, followAlias } from './file-operations.js'
@@ -94,6 +96,7 @@ function mount(ctx, config, trashFile, operations) {
   const lifetime = new AbortController()
   const state = {
     options,
+    baseOptions: options,
     signal: lifetime.signal,
     list: { at: 0, value: null },
     building: null,
@@ -120,6 +123,18 @@ function mount(ctx, config, trashFile, operations) {
     renameQueue: Promise.resolve(),
     pendingNames: new Set(),
   }
+
+  const organizer = createOrganizerStore(operations.organizerFile === false ? null : operations.organizerFile ||
+    join(process.env.DSH_HOME || join(homedir(), '.dsh'), 'recent-deliverables', 'organizer.json'))
+  state.organizer = organizer
+  const applyOrganizer = () => {
+    state.organizerState = organizer.snapshot()
+    const directories = state.organizerState.preferences.directories
+    state.options = { ...state.baseOptions, extraRoots: [...state.baseOptions.extraRoots, ...directories.extra],
+      ignoreRoots: [...state.baseOptions.ignoreRoots, ...directories.disabled] }
+  }
+  applyOrganizer()
+  state.organizerReady = organizer.ready.then(applyOrganizer)
 
   const weather = createWeatherService({ fetch: operations.fetchWeather, signal: lifetime.signal })
 
@@ -179,6 +194,23 @@ function mount(ctx, config, trashFile, operations) {
     fetch: serve((request) => renameResponse(state, request)),
   })
   ctx.connection.fetch.register({
+    path: '/api/recent-deliverables.organizer', methods: ['GET', 'POST'], requestBody: 'buffered',
+    fetch: serve(async (request) => {
+      await state.organizerReady
+      if (request.method === 'GET') return organizerResponse(ctx, state)
+      if (request.method !== 'POST') return json({ error: 'method-not-allowed' }, 405)
+      const { body, failure } = await jsonBody(request)
+      if (failure) return failure
+      try {
+        await organizer.save(body?.preferences, body?.revision)
+        applyOrganizer()
+        state.servable.clear(); state.deleteTickets.clear()
+        invalidateFiles(state)
+        return organizerResponse(ctx, state)
+      } catch (error) { return json({ error: error.code || 'organizer-save-failed', ...(error.path ? { path: error.path } : {}) }, error.status || 503) }
+    }),
+  })
+  ctx.connection.fetch.register({
     path: '/api/recent-deliverables.weather', methods: ['GET'], requestBody: 'buffered',
     fetch: serve(async (request) => {
       if (request.method !== 'GET') return json({ error: 'method-not-allowed' }, 405)
@@ -236,12 +268,12 @@ async function listResponse(ctx, state, request) {
  *   half is still folding must not be, so the follow-up request sees the fold).
  */
 async function buildList(ctx, state) {
-  await state.aliasesReady
+  await Promise.all([state.aliasesReady, state.organizerReady])
   const started = Date.now()
   const revision = state.revision
   const options = state.options
   const summaries = await loadSessionSummaries(ctx, state)
-  const roots = resolveRoots(ctx, summaries, options)
+  const roots = configuredRoots(ctx, summaries, state)
 
   // Start (or reuse) the background declared-deliverable fold. Items folded
   // from an earlier Session state stay visible while a refresh is in flight;
@@ -263,7 +295,8 @@ async function buildList(ctx, state) {
   const canonicalRoots = (await Promise.all(roots.map(async (root) => {
     try { return await realpath(root.path) } catch { return undefined }
   }))).filter(Boolean)
-  const live = await collectLiveFiles(candidates, canonicalRoots, state.deleteTickets)
+  const blocked = await blockedPaths(state)
+  const live = (await collectLiveFiles(candidates, canonicalRoots, state.deleteTickets)).filter((item) => !blocked.some((path) => isPathInside(path, item.path) || isPathInside(path, item.canonical)))
   const merged = mergeDeliverables(live.filter((item) => item.origin === 'present'),
     live.filter((item) => item.origin !== 'present'), options.maxItems, options.declaredSlots)
   const items = merged.items.map(publicItem).filter(Boolean)
@@ -293,7 +326,8 @@ async function buildList(ctx, state) {
         durationMs: Date.now() - started,
         at: Date.now(),
       },
-      roots: roots.slice(0, 8).map((root) => ({ path: root.path, label: root.label })),
+      roots: roots.map((root) => ({ path: root.path, label: root.label, source: root.source })),
+      organizer: state.organizerState,
       capabilities: describeCapabilities(ctx),
     },
   }
@@ -612,6 +646,35 @@ function resolveRoots(ctx, summaries, options) {
   return [...roots.values()].map(({ path, label }) => ({ path, label }))
 }
 
+function configuredRoots(ctx, summaries, state, includeDisabled = false) {
+  const preferences = state.organizerState.preferences.directories
+  const options = includeDisabled ? { ...state.options, ignoreRoots: [] } : state.options
+  const names = new Map(preferences.names.map((item) => [item.path, item.label]))
+  const ranks = new Map(preferences.order.map((path, index) => [path, index]))
+  const manual = new Set(preferences.extra)
+  const automatic = new Set(resolveRoots(ctx, summaries, { ...state.baseOptions, ignoreRoots: [] }).map((root) => directoryPath(root.path)))
+  return resolveRoots(ctx, summaries, options).map((root) => {
+    const path = directoryPath(root.path)
+    const inherited = preferences.disabled.some((parent) => parent !== path && isPathInside(parent, path))
+    const profileBlocked = state.baseOptions.ignoreRoots.some((parent) => isPathInside(toAbsolutePath(parent, ''), path))
+    return { path, label: names.get(path) || root.label, autoLabel: root.label, source: manual.has(path) && !automatic.has(path) ? 'manual' : 'auto',
+      enabled: !profileBlocked && !preferences.disabled.some((parent) => isPathInside(parent, path)), inheritedDisabled: inherited, profileBlocked }
+  }).sort((left, right) => (ranks.get(left.path) ?? 100000) - (ranks.get(right.path) ?? 100000))
+}
+
+async function blockedPaths(state) {
+  const values = state.options.ignoreRoots.map((path) => toAbsolutePath(path, '')).filter(Boolean)
+  return [...new Set([...values, ...(await Promise.all(values.map((path) => realpath(path).catch(() => null)))).filter(Boolean)])]
+}
+
+async function organizerResponse(ctx, state) {
+  const summaries = await loadSessionSummaries(ctx, state)
+  const snapshot = state.organizerState
+  const roots = configuredRoots(ctx, summaries, state, true)
+  const directories = await Promise.all(roots.map(async (root) => ({ ...root, available: await stat(root.path).then((info) => info.isDirectory()).catch(() => false) })))
+  return json({ ...snapshot, directories })
+}
+
 /**
  * Bounded, read-only breadth-first walk of every root.
  * @param state - plugin state.
@@ -621,7 +684,7 @@ function resolveRoots(ctx, summaries, options) {
 async function scanRoots(state, roots) {
   const options = state.options
   const now = Date.now()
-  const rootsKey = roots.map((root) => root.path).join('\n')
+  const rootsKey = JSON.stringify({ roots, ignored: options.ignoreRoots })
   if (state.files.at > 0 && now - state.files.at < options.cacheMs && state.files.rootsKey === rootsKey) {
     return state.files.items
   }
@@ -631,6 +694,7 @@ async function scanRoots(state, roots) {
   let truncated = false
   const budget = options.maxScanFiles > 0 ? options.maxScanFiles : Infinity
   const perRoot = Math.max(MIN_ROOT_BUDGET, Math.ceil(budget / Math.max(roots.length, 1)))
+  const ignored = await blockedPaths(state)
 
   for (const root of roots) {
     if (visited >= budget) {
@@ -641,6 +705,7 @@ async function scanRoots(state, roots) {
     let used = 0
     await walkRoot(root, options.scanDepth, options.extensions, {
       exhausted: () => used >= share || state.signal.aborted,
+      ignored: (path) => ignored.some((parent) => isPathInside(parent, path)),
       tick: () => {
         used += 1
         visited += 1
@@ -679,6 +744,7 @@ async function walkRoot(root, maxDepth, extensions, sink) {
         if (sink.exhausted()) return
         sink.tick()
         const entryName = entry.name
+        if (sink.ignored(join(node.dir, entryName))) continue
         if (entry.isDirectory()) {
           if (!isSkippedDirName(entryName) && node.depth < maxDepth) {
             next.push({ dir: join(node.dir, entryName), depth: node.depth + 1 })
@@ -693,7 +759,7 @@ async function walkRoot(root, maxDepth, extensions, sink) {
         // Scanning a symlink must not silently grant access outside this root.
         let target
         try { target = await realpath(path) } catch { continue }
-        if (!isPathInside(canonicalRoot, target)) continue
+        if (!isPathInside(canonicalRoot, target) || sink.ignored(target)) continue
         const info = await fileInfo(path)
         if (info === null) continue
         sink.push({
@@ -739,8 +805,10 @@ async function fileInfo(path) {
 async function isKnownPath(ctx, state, path) {
   // Callers supply a realpath, so neither dot segments nor symlink aliases
   // can pass a lexical prefix check before escaping the workspace.
+  await state.organizerReady
+  if ((await blockedPaths(state)).some((parent) => isPathInside(parent, path))) return false
   if (state.servable.has(path)) return true
-  const roots = resolveRoots(ctx, [], state.options)
+  const roots = configuredRoots(ctx, [], state)
   for (const root of roots) {
     try {
       if (isPathInside(await realpath(root.path), path)) return true
@@ -886,6 +954,7 @@ async function deleteResponse(state, request, trashFile) {
   try {
     let current
     try { current = await fileRecord(path) } catch { return json({ error: 'not-found' }, 404) }
+    if ((await blockedPaths(state)).some((parent) => isPathInside(parent, path) || (current && isPathInside(parent, current.canonical)))) return json({ error: 'not-listed' }, 403)
     if (!current || current.canonical !== ticket.canonical || current.identity !== ticket.identity) {
       return json({ error: 'file-changed' }, 409)
     }
@@ -948,6 +1017,9 @@ async function batchDeleteResponse(state, request, trashFile) {
     state.deleting.add(path)
     try {
       const current = await fileRecord(path)
+      if ((await blockedPaths(state)).some((parent) => isPathInside(parent, path) || (current && isPathInside(parent, current.canonical)))) {
+        state.deleting.delete(path); results.push({ path, deleted: false, status: 403, error: 'not-listed' }); continue
+      }
       if (!current || current.canonical !== ticket.canonical || current.identity !== ticket.identity) {
         state.deleting.delete(path)
         results.push({ path, deleted: false, status: 409, error: 'file-changed' }); continue
@@ -1001,6 +1073,7 @@ async function renameResponse(state, request) {
     oldAliases = state.aliases
     if (state.aliasError) return json({ error: 'rename-storage', message: state.aliasError }, 503)
     const current = await fileRecord(path)
+    if ((await blockedPaths(state)).some((parent) => isPathInside(parent, path) || (current && isPathInside(parent, current.canonical)))) return json({ error: 'not-listed' }, 403)
     if (!current || current.canonical !== ticket.canonical || current.identity !== ticket.identity) {
       return json({ error: 'file-changed' }, 409)
     }

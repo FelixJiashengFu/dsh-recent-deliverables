@@ -22,7 +22,7 @@ async function fixture(t, extra = {}, config = {}, trashFile, operations = {}) {
     },
     ...extra,
   }
-  const mount = createPlugin(trashFile, { renameMapFile: join(base, 'rename-history.json'), ...operations })
+  const mount = createPlugin(trashFile, { renameMapFile: join(base, 'rename-history.json'), organizerFile: join(base, 'organizer.json'), ...operations })
   mount({
     effect: (fn) => { const dispose = fn(); t.after(dispose) },
     get: (name) => services[name],
@@ -30,10 +30,10 @@ async function fixture(t, extra = {}, config = {}, trashFile, operations = {}) {
   }, { includePresent: Boolean(extra.sessionQuery), cacheMs: 0, ...config })
   const call = (action, path, body) => routes.get(`/api/recent-deliverables.${action}`)(
     new Request(`http://localhost/api/recent-deliverables.${action}?path=${encodeURIComponent(path ?? '')}`,
-      { method: ['open', 'delete', 'delete-batch', 'rename'].includes(action) ? 'POST' : 'GET',
-        ...(['delete', 'delete-batch', 'rename'].includes(action) ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? { path }) } : {}) }),
+      { method: (['open', 'delete', 'delete-batch', 'rename'].includes(action) || (action === 'organizer' && body !== undefined)) ? 'POST' : 'GET',
+        ...((['delete', 'delete-batch', 'rename'].includes(action) || (action === 'organizer' && body !== undefined)) ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? { path }) } : {}) }),
   )
-  return { base, root, call, opened, services }
+  return { base, root, call, opened, services, routes }
 }
 
 test('file and desktop routes reject parent traversal and sibling paths', async (t) => {
@@ -413,7 +413,7 @@ test('renamed declared files outside roots survive a new plugin instance', async
   assert.equal(response.status, 200)
   const target = (await response.json()).item.path
   const routes = new Map()
-  createPlugin(undefined, { renameMapFile: join(f.base, 'rename-history.json') })({
+  createPlugin(undefined, { renameMapFile: join(f.base, 'rename-history.json'), organizerFile: join(f.base, 'organizer.json') })({
     effect: (fn) => { const dispose = fn(); t.after(dispose) }, get: (name) => f.services[name],
     connection: { fetch: { register: (route) => routes.set(route.path, route.fetch) } },
   }, { includeFiles: false, cacheMs: 0 })
@@ -459,4 +459,84 @@ test('weather endpoint stays idle until requested and returns sanitized optional
   assert.equal('latitude' in data, false)
   await f.call('weather')
   assert.equal(calls, 2)
+})
+
+test('organizer discovers workspaces and sessions, and saves labels plus additional scope', async (t) => {
+  const { root, base, call, services } = await fixture(t)
+  const session = join(base, 'session'); const extra = join(base, 'extra')
+  await mkdir(session); await mkdir(extra); await writeFile(join(extra, 'added.txt'), 'extra')
+  services.sessionController.list = async () => ({ items: [{ sessionId: 's', updatedAt: Date.now(), cwd: session }] })
+  const settings = await (await call('organizer')).json()
+  assert.deepEqual(new Set(settings.directories.map((item) => item.path)), new Set([root, session]))
+  settings.preferences.directories = { extra: [extra, root], disabled: [], names: [{ path: root, label: 'My workspace' }], order: [extra, session, root] }
+  const response = await call('organizer', '', settings)
+  assert.equal(response.status, 200)
+  const saved = await response.json()
+  assert.equal(saved.directories[0].source, 'manual')
+  const list = await (await call('list')).json()
+  assert.deepEqual(list.roots.map((item) => item.path), [extra, session, root])
+  assert.equal(saved.directories.find((item) => item.path === root).autoLabel, 'workspace')
+  assert.equal(saved.directories.find((item) => item.path === root).source, 'auto')
+  assert.equal(list.items.find((item) => item.name === 'inside.txt').rootLabel, 'My workspace')
+  assert.equal(list.items.some((item) => item.name === 'added.txt'), true)
+  assert.equal((await call('file', join(extra, 'added.txt'))).status, 200)
+  const stale = await call('organizer', '', settings)
+  assert.equal(stale.status, 409)
+  saved.preferences.directories.extra = []
+  assert.equal((await call('organizer', '', saved)).status, 200)
+  assert.equal((await call('file', join(extra, 'added.txt'))).status, 403)
+  assert.equal(await readFile(join(extra, 'added.txt'), 'utf8'), 'extra')
+})
+
+test('pausing a nested directory revokes reads and stale mutation tickets even through aliases', async (t) => {
+  let trashed = false
+  const { root, base, call } = await fixture(t, {}, {}, async () => { trashed = true })
+  const nested = join(root, 'nested'); await mkdir(nested)
+  const file = join(nested, 'private.txt'); await writeFile(file, 'keep this file')
+  await symlink(nested, join(root, 'alias'), 'dir')
+  const list = await (await call('list')).json()
+  const item = list.items.find((item) => item.path === file)
+  const settings = await (await call('organizer')).json()
+  settings.preferences.directories.disabled = [nested]
+  assert.equal((await call('organizer', '', settings)).status, 200)
+  const after = await (await call('list')).json()
+  assert.equal(after.items.some((entry) => entry.path.startsWith(nested)), false)
+  for (const path of [file, join(root, 'alias', 'private.txt')]) {
+    assert.equal((await call('file', path)).status, 403)
+    assert.equal((await call('open', path)).status, 403)
+  }
+  assert.equal((await call('delete', file, { path: file, token: item.deleteToken })).status, 403)
+  assert.equal((await call('rename', file, { path: file, token: item.deleteToken, name: 'changed.txt' })).status, 403)
+  assert.equal(trashed, false)
+  assert.equal(await readFile(file, 'utf8'), 'keep this file')
+  assert.equal((await call('file', join(root, 'inside.txt'))).status, 200)
+})
+
+test('organizer rejects invalid scopes without erasing saved settings and honors profile exclusions', async (t) => {
+  const { root, base, call } = await fixture(t, {}, { ignoreRoots: [] })
+  const original = await (await call('organizer')).json()
+  const invalid = structuredClone(original); invalid.preferences.directories.extra = [join(base, 'absent')]
+  assert.equal((await call('organizer', '', invalid)).status, 400)
+  assert.equal((await (await call('organizer')).json()).revision, original.revision)
+  const blocked = await fixture(t, {}, { ignoreRoots: [root] })
+  // A configured unavailable root remains safe; built-in profile exclusions cannot be removed by UI preferences.
+  blocked.services.workingDirectory.defaultDirectory = root
+  assert.equal((await blocked.call('file', join(root, 'inside.txt'))).status, 403)
+  const settings = await (await blocked.call('organizer')).json()
+  assert.equal(settings.directories[0].profileBlocked, true)
+  assert.equal((await blocked.call('organizer', '', settings)).status, 200)
+  assert.equal((await blocked.call('file', join(root, 'inside.txt'))).status, 403)
+})
+
+test('organizer requires JSON POST for writes and rejects stale revisions', async (t) => {
+  const { call, routes } = await fixture(t)
+  const handler = routes.get('/api/recent-deliverables.organizer')
+  const url = 'http://localhost/api/recent-deliverables.organizer'
+  assert.equal((await handler(new Request(url, { method: 'DELETE' }))).status, 405)
+  assert.equal((await handler(new Request(url, { method: 'POST', body: '{}' }))).status, 415)
+  assert.equal((await handler(new Request(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{invalid' }))).status, 400)
+  const settings = await (await call('organizer')).json()
+  assert.equal((await call('organizer', '', { ...settings, revision: 'forged' })).status, 409)
+  assert.equal((await call('organizer', '', { preferences: settings.preferences })).status, 409)
+  assert.equal((await (await call('organizer')).json()).revision, settings.revision)
 })

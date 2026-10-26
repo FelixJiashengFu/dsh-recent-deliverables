@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7.0 — 2026-10-25
+
+- Reflow complete filenames, descriptions and metadata into the available width. Keep delivery badges horizontal and place row actions below the text, with unchanged selection geometry.
+- Discover categories by file type and folders from DSH workspaces, the default directory and session working directories. Switch between category and folder browsing.
+- Add an animated capsule organizer with draft/save/cancel, keyboard focus management, reduced motion and narrow-viewport layouts. Rename, reorder or hide categories, and create extension/filename rules while automatic types continue to appear.
+- Edit folder display names and order, pause/resume collection or add/remove a manual collection folder. Preserve original files, respect parent/profile exclusions and revoke old file tickets when scope changes.
+- Persist organizer preferences atomically in `recent-deliverables/organizer.json`, validate readable added directories, reject conflicting edits and protect saved settings from stale list responses.
+- Include updated bilingual documentation and actual UI promotional images. GitHub release assets are available independently of npm registry publication.
+
 ## 1.6.0 — 2026-10-25
 
 - Place the local clock and weather together in one horizontal row at the right of the header, beside the existing actions. Keep the title/count from overlapping them in Chinese and English.
