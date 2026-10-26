@@ -94,6 +94,19 @@ window.__ModuleLoader__.load({
 
     const DICTIONARY = {
       en: {
+        'resize.title': 'Resize panel',
+        'resize.hint': 'Drag any edge or corner · arrow keys adjust · double-click or Home resets size',
+        'resize.reset': 'Reset panel size',
+        'resize.settings': 'Panel size',
+        'resize.settingsHint': 'Drag all four edges or corners. Size is saved on this device.',
+        'resize.n': 'Top edge',
+        'resize.s': 'Bottom edge',
+        'resize.w': 'Left edge',
+        'resize.e': 'Right edge',
+        'resize.nw': 'Top-left corner',
+        'resize.ne': 'Top-right corner',
+        'resize.sw': 'Bottom-left corner',
+        'resize.se': 'Bottom-right corner',
         'settings.clock': 'Current local time',
         'settings.clockShow': 'Show clock',
         'settings.clockHide': 'Hide clock',
@@ -251,6 +264,19 @@ window.__ModuleLoader__.load({
         'platform.slack': 'Slack',
       },
       zh: {
+        'resize.title': '调整浮窗大小',
+        'resize.hint': '拖动边缘或角落调整 · 方向键微调 · 双击或 Home 恢复尺寸',
+        'resize.reset': '恢复默认大小',
+        'resize.settings': '浮窗大小',
+        'resize.settingsHint': '四边和四角都可以拖动，宽高会保存在本机。',
+        'resize.n': '上边',
+        'resize.s': '下边',
+        'resize.w': '左边',
+        'resize.e': '右边',
+        'resize.nw': '左上角',
+        'resize.ne': '右上角',
+        'resize.sw': '左下角',
+        'resize.se': '右下角',
         'settings.clock': '当前所在地时间',
         'settings.clockShow': '显示时钟',
         'settings.clockHide': '不显示时钟',
@@ -570,6 +596,29 @@ window.__ModuleLoader__.load({
       }
     }
 
+    function fitPanelSize(size, viewport) {
+      const vw = Number.isFinite(viewport?.width) ? viewport.width : window.innerWidth
+      const vh = Number.isFinite(viewport?.height) ? viewport.height : window.innerHeight
+      const maxWidth = Math.max(1, vw - 16), maxHeight = Math.max(1, vh - 16)
+      return {
+        width: Math.round(Math.min(maxWidth, Math.max(Math.min(300, maxWidth), size.width))),
+        height: Math.round(Math.min(maxHeight, Math.max(Math.min(280, maxHeight), size.height))),
+      }
+    }
+
+    /** Move only the requested edges, keeping their opposite edges anchored. */
+    function resizedPanelRect(start, edge, dx, dy, viewport) {
+      const vw = Number.isFinite(viewport?.width) ? viewport.width : window.innerWidth
+      const vh = Number.isFinite(viewport?.height) ? viewport.height : window.innerHeight
+      const minimum = fitPanelSize({ width: 0, height: 0 }, { width: vw, height: vh })
+      let left = start.left, top = start.top, right = start.left + start.width, bottom = start.top + start.height
+      if (edge.includes('w')) left = Math.min(right - minimum.width, Math.max(8, left + dx))
+      if (edge.includes('e')) right = Math.max(left + minimum.width, Math.min(vw - 8, right + dx))
+      if (edge.includes('n')) top = Math.min(bottom - minimum.height, Math.max(8, top + dy))
+      if (edge.includes('s')) bottom = Math.max(top + minimum.height, Math.min(vh - 8, bottom + dy))
+      return { left, top, right: vw - right, width: right - left, height: bottom - top }
+    }
+
     /**
      * Turn the IM Assistant's `/api/dsh-im-connect/channels` payload into the
      * forward targets the picker lists. Muted and detached bindings are skipped
@@ -853,6 +902,8 @@ window.__ModuleLoader__.load({
         filter: allowed ? filter : 'all',
         right: Number.isFinite(parsed.right) ? parsed.right : null,
         top: Number.isFinite(parsed.top) ? parsed.top : null,
+        size: Number.isFinite(parsed.size?.width) && parsed.size.width > 0 && Number.isFinite(parsed.size?.height) && parsed.size.height > 0
+          ? { width: Math.min(10000, Math.round(parsed.size.width)), height: Math.min(10000, Math.round(parsed.size.height)) } : null,
         showTime: parsed.showTime !== false,
         showClock: parsed.showClock === true,
         showWeather: parsed.showWeather === true,
@@ -1017,7 +1068,7 @@ window.__ModuleLoader__.load({
 --rd-serif:var(--dsh-claude-font-serif,ui-serif,"Iowan Old Style",Georgia,"Times New Roman",serif);
 --rd-ease:var(--dsh-claude-ease-settle,cubic-bezier(.22,1,.36,1));
 --rd-open:var(--dsh-claude-duration-open,.24s);}
-.rd-panel{box-sizing:border-box;width:336px;max-width:calc(100vw - 32px);max-height:min(64vh,560px);display:flex;flex-direction:column;background:var(--rd-surface);border:1px solid var(--rd-line);border-radius:15px;box-shadow:0 20px 44px -24px rgba(20,20,19,.42),0 2px 8px -3px rgba(20,20,19,.16);overflow:hidden;animation:rd-in var(--rd-open) var(--rd-ease)}
+.rd-panel{box-sizing:border-box;width:var(--rd-panel-width,336px);height:var(--rd-panel-height,auto);min-width:min(300px,calc(100vw - 16px));min-height:min(280px,calc(100vh - 16px));max-width:calc(100vw - 16px);max-height:var(--rd-panel-max-height,min(64vh,560px));display:flex;flex-direction:column;background:var(--rd-surface);border:1px solid var(--rd-line);border-radius:15px;box-shadow:0 20px 44px -24px rgba(20,20,19,.42),0 2px 8px -3px rgba(20,20,19,.16);overflow:hidden;animation:rd-in var(--rd-open) var(--rd-ease)}
 .rd-head{display:flex;align-items:flex-start;gap:9px;padding:12px 12px 10px;cursor:grab;touch-action:none;user-select:none}
 .rd-root[data-dragging="true"] .rd-head,.rd-root[data-dragging="true"] .rd-pill{cursor:grabbing}
 .rd-root[data-dragging="true"]{animation:none}
@@ -1048,7 +1099,9 @@ window.__ModuleLoader__.load({
 .rd-title{font-family:var(--rd-serif);font-size:15px;font-weight:600;letter-spacing:.005em;color:var(--rd-ink);display:flex;align-items:center;gap:6px}
 .rd-count{font-family:var(--dsw-font-family,inherit);font-size:10px;font-weight:600;letter-spacing:.02em;color:var(--rd-accent);background:color-mix(in srgb,var(--rd-accent) 13%,transparent);border-radius:999px;padding:1px 6px;line-height:1.5}
 .rd-sub{font-size:10.5px;color:var(--rd-ink-3);letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rd-head-actions{display:flex;align-items:center;gap:1px;margin-right:-4px;margin-top:-2px}
+.rd-title-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rd-count{flex:none}
+.rd-head-actions{flex:none;display:flex;align-items:center;gap:1px;margin-right:-4px;margin-top:-2px}
 .rd-icon{flex:none;width:24px;height:24px;display:grid;place-items:center;border:none;border-radius:7px;background:transparent;color:var(--rd-ink-3);cursor:pointer;transition:background var(--rd-open) var(--rd-ease),color var(--rd-open) var(--rd-ease)}
 .rd-icon:hover{background:var(--rd-hover);color:var(--rd-ink)}
 .rd-icon:focus-visible{outline:2px solid var(--rd-accent);outline-offset:1px}
@@ -1118,6 +1171,7 @@ window.__ModuleLoader__.load({
 .rd-list[data-sweeping="true"]{user-select:none;touch-action:none}
 .rd-now{display:flex;align-items:center;gap:6px;min-height:15px;font-size:10px;line-height:15px;color:var(--rd-ink-3);font-variant-numeric:tabular-nums;white-space:nowrap}
 .rd-now time{color:var(--rd-ink-2)}
+.rd-head-actions .rd-now{display:inline-flex;flex:none;flex-direction:row;align-items:center;gap:5px;margin-right:5px;min-height:24px}
 .rd-weather-emoji{font-size:13px;line-height:15px}
 .rd-weather-emoji[data-stale="true"]{opacity:.55}
 .rd-weather-details{font-size:10.5px;line-height:1.6;color:var(--rd-ink-2)}
@@ -1169,6 +1223,23 @@ window.__ModuleLoader__.load({
 .rd-btn:focus-visible{outline:2px solid var(--rd-accent);outline-offset:1px}
 .rd-toast{position:fixed;bottom:22px;right:16px;z-index:90;max-width:320px;padding:8px 12px;border-radius:9px;background:var(--rd-surface);border:1px solid var(--rd-line);color:var(--rd-ink);font-size:11.5px;box-shadow:0 14px 34px -18px rgba(20,20,19,.5);animation:rd-in var(--rd-open) var(--rd-ease)}
 .rd-panel{position:relative}
+.rd-resize-layer{position:absolute;inset:0;pointer-events:none;z-index:60}
+.rd-resize-handle{position:absolute;box-sizing:border-box;display:block;border:0;background:transparent;padding:0;margin:0;touch-action:none;user-select:none;pointer-events:auto;border-radius:5px}
+.rd-resize-handle:hover,.rd-resize-handle:focus-visible{background:color-mix(in srgb,var(--rd-accent) 18%,transparent)}
+.rd-resize-handle:focus-visible{outline:2px solid var(--rd-accent);outline-offset:1px}
+.rd-resize-n,.rd-resize-s{height:10px;left:12px;right:12px;cursor:ns-resize}
+.rd-resize-n{top:-5px}.rd-resize-s{bottom:-5px}
+.rd-resize-e,.rd-resize-w{width:10px;top:12px;bottom:12px;cursor:ew-resize}
+.rd-resize-e{right:-5px}.rd-resize-w{left:-5px}
+.rd-resize-nw,.rd-resize-ne,.rd-resize-sw,.rd-resize-se{width:16px;height:16px}
+.rd-resize-nw{left:-5px;top:-5px;cursor:nwse-resize}.rd-resize-ne{right:-5px;top:-5px;cursor:nesw-resize}
+.rd-resize-sw{left:-5px;bottom:-5px;cursor:nesw-resize}.rd-resize-se{right:-5px;bottom:-5px;cursor:nwse-resize}
+.rd-resize-se::after{content:'';position:absolute;width:7px;height:7px;right:5px;bottom:5px;border-right:1px solid var(--rd-ink-3);border-bottom:1px solid var(--rd-ink-3);border-radius:0 0 3px 0;opacity:.65}
+.rd-resize-guard{display:none;position:fixed;inset:0;z-index:100;cursor:var(--rd-resize-cursor,default);background:transparent;touch-action:none}
+.rd-root[data-resizing="true"] .rd-resize-guard{display:block}
+.rd-root[data-resizing="true"] .rd-panel{user-select:none}
+.rd-root[data-resizing="true"] .rd-resize-handle{background:transparent}
+
 .rd-sheet{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;background:var(--rd-surface);border-radius:15px;overflow:hidden;animation:rd-in var(--rd-open) var(--rd-ease)}
 .rd-sheet-head{flex:none;display:flex;align-items:center;gap:8px;padding:10px 10px 8px}
 .rd-sheet-title{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
@@ -1199,7 +1270,7 @@ window.__ModuleLoader__.load({
 @keyframes rd-pop{from{opacity:0;transform:translateY(8px) scale(.99)}to{opacity:1;transform:none}}
 @keyframes rd-spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.rd-panel,.rd-backdrop,.rd-modal,.rd-toast{animation:none}.rd-pill:hover{transform:none}.rd-spinner,.rd-icon[data-spinning="true"] svg{animation-duration:2.4s}}
-@media (max-width:640px){.rd-root{right:10px}.rd-panel{width:min(336px,calc(100vw - 20px))}}
+@media (max-width:640px){.rd-root{right:10px}.rd-panel{width:var(--rd-panel-width,min(336px,calc(100vw - 20px)))}}
 `
 
     // -----------------------------------------------------------------------
@@ -1243,6 +1314,10 @@ window.__ModuleLoader__.load({
         const stored = loadUiState()
         return stored.right === null || stored.top === null ? null : { right: stored.right, top: stored.top }
       })
+      const panelRef = React.useRef(null)
+      const sizeRef = React.useRef(ui.size)
+      const resizeState = React.useRef(null)
+      sizeRef.current = ui.size
       const positionRef = React.useRef(position)
       const dragState = React.useRef(null)
       const suppressClick = React.useRef(false)
@@ -1291,7 +1366,7 @@ window.__ModuleLoader__.load({
       React.useEffect(() => {
         if (ui.collapsed) return undefined
         const onOutside = (event) => {
-          if (dragState.current !== null || sweepRef.current !== null || !outsidePanel(event, rootRef.current)) return
+          if (dragState.current !== null || resizeState.current !== null || sweepRef.current !== null || !outsidePanel(event, rootRef.current)) return
           setUi((current) => ({ ...current, collapsed: true }))
           saveUiState({ collapsed: true })
           setSettingsOpen(false)
@@ -1365,6 +1440,7 @@ window.__ModuleLoader__.load({
           if (toastTimer.current !== null) window.clearTimeout(toastTimer.current)
           if (removeTimer.current !== null) window.clearTimeout(removeTimer.current)
           sweepRef.current?.cleanup()
+          resizeState.current?.cleanup()
           for (const timer of heartTimers.current) window.clearTimeout(timer)
         },
         [],
@@ -1387,24 +1463,43 @@ window.__ModuleLoader__.load({
         node.style.left = 'auto'
       }, [position])
 
-      // Keep a stored anchor on screen across window resizes and across the
-      // collapse/expand height change (a low panel is nudged up, not clipped).
-      React.useEffect(() => {
+      const applyPanelSize = (preferred) => {
         const node = rootRef.current
-        if (node === null) return undefined
+        if (!node) return
+        if (!preferred) {
+          node.style.removeProperty('--rd-panel-width')
+          node.style.removeProperty('--rd-panel-height')
+          node.style.removeProperty('--rd-panel-max-height')
+          return
+        }
+        const size = fitPanelSize(preferred)
+        node.style.setProperty('--rd-panel-width', `${size.width}px`)
+        node.style.setProperty('--rd-panel-height', `${size.height}px`)
+        node.style.setProperty('--rd-panel-max-height', 'calc(100vh - 16px)')
+      }
+
+      // React commits the preferred size; viewport constraints only affect its presentation.
+      React.useLayoutEffect(() => {
+        const node = rootRef.current
+        if (!node) return undefined
         const clamp = () => {
+          if (resizeState.current || dragState.current) return
+          applyPanelSize(sizeRef.current)
           const rect = node.getBoundingClientRect()
           const base = positionRef.current ?? { right: window.innerWidth - rect.right, top: rect.top }
           const next = clampPanelPosition(base, rect.width, rect.height)
           if (Math.abs(next.right - base.right) < 1 && Math.abs(next.top - base.top) < 1) return
+          node.style.right = `${next.right}px`; node.style.top = `${next.top}px`; node.style.left = 'auto'
           positionRef.current = next
           setPosition(next)
           saveUiState({ right: next.right, top: next.top })
         }
         clamp()
         window.addEventListener('resize', clamp)
-        return () => window.removeEventListener('resize', clamp)
-      }, [ui.collapsed, settingsOpen, ui.language])
+        const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(clamp) : null
+        observer?.observe(node)
+        return () => { window.removeEventListener('resize', clamp); observer?.disconnect() }
+      }, [ui.collapsed, settingsOpen, ui.language, ui.size, ui.showClock, ui.showWeather])
 
       const showToast = (text) => {
         setToast(text)
@@ -1496,6 +1591,92 @@ window.__ModuleLoader__.load({
           node.style.right = ''
           node.style.top = ''
         }
+      }
+
+      const commitPanelRect = (rect) => {
+        const size = fitPanelSize(rect)
+        const next = clampPanelPosition({ right: rect.right, top: rect.top }, size.width, size.height)
+        sizeRef.current = size; positionRef.current = next
+        applyPanelSize(size)
+        const node = rootRef.current
+        if (node) { node.style.right = `${next.right}px`; node.style.top = `${next.top}px`; node.style.left = 'auto' }
+        setUi((current) => ({ ...current, size }))
+        setPosition(next)
+        saveUiState({ size, right: next.right, top: next.top })
+      }
+
+      const resetSize = () => {
+        sizeRef.current = null
+        applyPanelSize(null)
+        setUi((current) => ({ ...current, size: null }))
+        saveUiState({ size: null })
+      }
+
+      const startResize = (event, edge) => {
+        if (event.button !== 0 || resizeState.current || dragState.current || sweepRef.current) return
+        const panel = panelRef.current, node = rootRef.current
+        if (!panel || !node) return
+        event.preventDefault(); event.stopPropagation()
+        const rect = panel.getBoundingClientRect()
+        const state = { id: event.pointerId, handle: event.currentTarget, x: event.clientX, y: event.clientY,
+          start: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+          originalSize: sizeRef.current, originalPosition: positionRef.current, next: null, cleanup: null }
+        const cursor = { n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize', nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize' }[edge]
+        node.dataset.resizing = 'true'
+        node.style.setProperty('--rd-resize-cursor', cursor)
+        const move = (next) => {
+          if (next.pointerId !== state.id) return
+          next.preventDefault()
+          state.next = resizedPanelRect(state.start, edge, next.clientX - state.x, next.clientY - state.y)
+          applyPanelSize(state.next)
+          node.style.right = `${state.next.right}px`; node.style.top = `${state.next.top}px`; node.style.left = 'auto'
+        }
+        const finish = (commit) => {
+          if (resizeState.current !== state) return
+          state.cleanup()
+          if (commit && state.next) commitPanelRect(state.next)
+          else {
+            applyPanelSize(state.originalSize)
+            node.style.right = state.originalPosition ? `${state.originalPosition.right}px` : ''
+            node.style.top = state.originalPosition ? `${state.originalPosition.top}px` : ''
+            node.style.left = state.originalPosition ? 'auto' : ''
+          }
+        }
+        const end = (next) => { if (next.pointerId === state.id) finish(true) }
+        const key = (next) => { if (next.key === 'Escape') { next.preventDefault(); next.stopPropagation(); finish(false) } }
+        const interrupted = () => finish(true)
+        state.cleanup = () => {
+          window.removeEventListener('pointermove', move)
+          window.removeEventListener('pointerup', end)
+          window.removeEventListener('pointercancel', end)
+          window.removeEventListener('keydown', key, true)
+          window.removeEventListener('blur', interrupted)
+          window.removeEventListener('resize', interrupted)
+          delete node.dataset.resizing
+          node.style.removeProperty('--rd-resize-cursor')
+          try { state.handle.releasePointerCapture?.(state.id) } catch {}
+          if (resizeState.current === state) resizeState.current = null
+        }
+        resizeState.current = state
+        try { state.handle.setPointerCapture?.(state.id) } catch {}
+        window.addEventListener('pointermove', move, { passive: false })
+        window.addEventListener('pointerup', end)
+        window.addEventListener('pointercancel', end)
+        window.addEventListener('keydown', key, true)
+        window.addEventListener('blur', interrupted)
+        window.addEventListener('resize', interrupted)
+      }
+
+      const resizeWithKeys = (event, edge) => {
+        if (event.key === 'Home') { event.preventDefault(); resetSize(); return }
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return
+        event.preventDefault()
+        const rect = panelRef.current?.getBoundingClientRect()
+        if (!rect) return
+        const step = event.shiftKey ? 30 : 10
+        const dx = /[we]/.test(edge) ? (event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0) : 0
+        const dy = /[ns]/.test(edge) ? (event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0) : 0
+        if (dx || dy) commitPanelRect(resizedPanelRect(rect, edge, dx, dy))
       }
 
       const updatePreference = (patch) => {
@@ -2010,7 +2191,7 @@ window.__ModuleLoader__.load({
         h('style', { key: 'rd-style' }, CSS),
         h(
           'section',
-          { className: 'rd-panel', role: 'region', 'aria-label': t('title') },
+          { className: 'rd-panel', role: 'region', 'aria-label': t('title'), ref: panelRef },
           h(
             'header',
             {
@@ -2036,15 +2217,15 @@ window.__ModuleLoader__.load({
               h(
                 'span',
                 { className: 'rd-title' },
-                t('title'),
+                h('span', { className: 'rd-title-text' }, t('title')),
                 h('span', { className: 'rd-count' }, String(counts.all)),
               ),
               h('span', { className: 'rd-sub' }, t(stats?.presentPending ? 'scan.pending' : 'subtitle')),
-              h(AmbientStatus, { showClock: ui.showClock, showWeather: ui.showWeather }),
             ),
             h(
               'span',
               { className: 'rd-head-actions' },
+              h(AmbientStatus, { showClock: ui.showClock, showWeather: ui.showWeather }),
               h('button', {
                 className: 'rd-icon rd-lang', type: 'button',
                 title: t(activeLanguage === 'zh' ? 'settings.switchEnglish' : 'settings.switchChinese'),
@@ -2201,6 +2382,12 @@ window.__ModuleLoader__.load({
         ),
         toast !== null ? h('div', { className: 'rd-toast', role: 'status', key: 'toast' }, toast) : null,
         preview !== null ? renderPreview(preview) : null,
+        preview === null ? h('div', { className: 'rd-resize-layer', role: 'group', 'aria-label': t('resize.title') },
+          ['n', 's', 'w', 'e', 'nw', 'ne', 'sw', 'se'].map((edge) => h('button', { type: 'button', key: edge,
+            className: `rd-resize-handle rd-resize-${edge}`, 'aria-label': `${t('resize.title')} — ${t('resize.' + edge)}`,
+            title: t('resize.hint'), onPointerDown: (event) => startResize(event, edge),
+            onKeyDown: (event) => resizeWithKeys(event, edge), onDoubleClick: resetSize }))) : null,
+        h('div', { className: 'rd-resize-guard', 'aria-hidden': 'true' }),
         h('div', { className: 'rd-heart-layer', 'aria-hidden': 'true' }, heartBursts.map((burst) => h('span', { key: burst.id, className: 'rd-heart-burst', style: { left: burst.x, top: burst.y } },
           [-26, -16, -7, 8, 18, 28, 2].map((x, index) => h('span', { key: index, className: 'rd-heart', style: { '--rd-heart-x': `${x}px`, '--rd-heart-y': `${-45 - (index % 3) * 15}px`, '--rd-heart-delay': `${index * 25}ms`, '--rd-heart-rotate': `${x / 2}deg` } }, h(Icon, { name: 'heart', size: 14 })))))) ,
       )
@@ -2239,6 +2426,10 @@ window.__ModuleLoader__.load({
             h('div', { className: 'rd-weather-sources' },
               h('a', { href: 'https://open-meteo.com/', target: '_blank', rel: 'noopener noreferrer' }, 'Weather: Open-Meteo'),
               h('a', { href: 'https://ipapi.co/', target: '_blank', rel: 'noopener noreferrer' }, 'Location: ipapi.co'))),
+          h('div', { className: 'rd-settings-group' },
+            h('span', { className: 'rd-settings-label' }, t('resize.settings')),
+            h('p', { className: 'rd-settings-hint' }, t('resize.settingsHint')),
+            h('button', { type: 'button', className: 'rd-btn', onClick: resetSize }, t('resize.reset'))),
           h('div', { className: 'rd-settings-group' },
             h('span', { className: 'rd-settings-label' }, t('settings.character')),
             h('p', { className: 'rd-settings-hint' }, t('settings.characterHint')),

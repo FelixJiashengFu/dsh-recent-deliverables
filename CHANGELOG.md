@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.0 — 2026-10-25
+
+- Place the local clock and weather together in one horizontal row at the right of the header, beside the existing actions. Keep the title/count from overlapping them in Chinese and English.
+- Add eight resize handles: all four edges and all four corners. Preserve opposite edges while resizing and update dimensions imperatively during pointer movement.
+- Persist preferred expanded width/height with the existing local UI settings. Preserve compact capsule size, restore expanded dimensions on reopen, fit smaller viewports without overwriting preferred dimensions, and track content-size changes.
+- Add double-click/keyboard Home reset and an Appearance & language reset button. Support arrow-key adjustments, Shift for larger steps, Escape cancellation, pointer capture and cleanup on interruption.
+- Add viewport, edge-anchor, corner/minimum/maximum and preference migration tests; verify all eight handles, reload/capsule persistence, narrow-window recovery, keyboard controls and stable selection in the browser.
+- Refresh the feature images and add a before/after size illustration.
+
 ## 1.5.0 — 2026-10-25
 
 - Keep batch actions inside the original fixed-height hint area. Overlay checkboxes on file tiles and preserve action spacing so list position, row heights and filename widths remain stable while selecting.

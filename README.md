@@ -2,11 +2,11 @@
 
 **做出来的文件，都在手边。** 一个给 DeepSeek Harness 用的成品浮窗，集中查看 PDF、网页、Office、图片和文本，直接预览、改名、整理，或用系统应用打开。
 
-![Recent Deliverables 1.5.0：完整计数、拖选整理、直接改名、时间开关和卡通胶囊](https://raw.githubusercontent.com/FelixJiashengFu/dsh-recent-deliverables/main/docs/images/hero.png)
+![Recent Deliverables 1.6.0：完整计数、拖选整理、直接改名、时间开关和卡通胶囊](https://raw.githubusercontent.com/FelixJiashengFu/dsh-recent-deliverables/main/docs/images/hero.png)
 
 [下载最新版](https://github.com/FelixJiashengFu/dsh-recent-deliverables/releases/latest) · [安装说明](./INSTALL.md) · [更新记录](./CHANGELOG.md) · [English](#english)
 
-## 1.5.0：选择不跳动，时间与天气随手看
+## 1.6.0：右侧一排时钟天气，浮窗大小随手调
 
 | 操作 | 结果 |
 | --- | --- |
@@ -25,9 +25,21 @@
 
 重命名会改动磁盘上的真实文件名，保留文件内容。遇到同名目标会提示，**不会覆盖已有文件**；拒绝路径分隔符和 Windows 保留名。重命名后的交付文件会继续对应到原交付记录，本机重命名映射保存在 DSH 数据目录的 `recent-deliverables/renames.json`，不修改会话日志。文件扩展名建议保留，以便系统继续识别文件类型。
 
+## 四边四角都能调整大小
+
+展开浮窗后，把鼠标移到 **上、下、左、右边缘或四个角**，出现缩放光标后按住拖动：单边改变宽或高，角落同时改变两者。拖动过程中对边保持固定，文件列表随可用空间滚动。
+
+- 宽高保存在浏览器本机，刷新、重开页面、收成胶囊再展开都会恢复。
+- 胶囊保留小巧尺寸，展开才使用保存的宽高。窗口暂时变小时自动限制到可见范围，窗口恢复后继续使用偏好的尺寸。
+- **双击任意边缘或角落** 恢复默认大小；也可在左上角头像 → 外观与语言 → 浮窗大小 → **恢复默认大小**。
+- 缩放手柄支持键盘：方向键移动边缘 10 像素，Shift + 方向键移动 30 像素，Home 恢复默认大小。指针调整过程中 Esc 取消本次缩放。
+- 原来的标题栏拖动位置、双击标题栏复位仍可使用。最小尺寸保留操作空间，最大尺寸限制在窗口范围内。
+
+![四边四角缩放，记住展开浮窗的宽高](https://raw.githubusercontent.com/FelixJiashengFu/dsh-recent-deliverables/main/docs/images/resize.png)
+
 ## 当前所在地时间与自动天气
 
-展开浮窗后，标题下方可以显示小巧的 **`19:07 ☀️`**。点击左上角头像 → **外观与语言**，三个开关分别控制：
+展开浮窗后，**标题栏右侧**以一排显示小巧的 **`19:07 ☀️`**，与语言、刷新、收起按钮排在一起，不再放在左侧副标题下面。点击左上角头像 → **外观与语言**，三个开关分别控制：
 
 | 开关 | 作用 |
 | --- | --- |
@@ -69,7 +81,7 @@
 
 支持 **Windows 与 macOS** 的 DSH Web 插件系统；Windows 使用系统回收站，macOS 使用系统废纸篓。自动化测试覆盖 Windows、macOS、Linux；真实 DSH / 浏览器交互在 Mac 上验证，Windows 桌面界面仍需实机验证。
 
-从 [GitHub Releases](https://github.com/FelixJiashengFu/dsh-recent-deliverables/releases/latest) 下载 `dsh-recent-deliverables-1.5.0.tgz`，通过 DSH CLI 安装，或解压成固定本地目录后在图形界面添加。两种方法见 [INSTALL.md](./INSTALL.md)。若 npm 尚未同步最新版，请优先使用 Releases 包；包名为 `dsh-recent-deliverables`。
+从 [GitHub Releases](https://github.com/FelixJiashengFu/dsh-recent-deliverables/releases/latest) 下载 `dsh-recent-deliverables-1.6.0.tgz`，通过 DSH CLI 安装，或解压成固定本地目录后在图形界面添加。两种方法见 [INSTALL.md](./INSTALL.md)。若 npm 尚未同步最新版，请优先使用 Releases 包；包名为 `dsh-recent-deliverables`。
 
 升级后请**完全退出并重新打开 DSH**，让宿主路由与前端同时更新。
 
@@ -176,7 +188,7 @@ npm pack --dry-run
 
 **Recent Deliverables** keeps files produced in DeepSeek Harness within reach. Preview PDF, HTML, images and text; open Office files in their native apps; search or filter the full collected list.
 
-Version 1.5 keeps selection controls in a fixed space, so entering batch selection preserves list position, row height and text width. The centered trash bin releases heart bubbles only after a click. Independent local-clock and automatic-weather switches join file-time preferences. Direct inline renaming, collision protection and the clean filter strip remain available. Chinese/English, local cartoon avatars and outside-click collapse are included. The clock follows the browser computer’s timezone and works offline. Optional weather uses approximate host-IP location from ipapi.co and Open-Meteo data; it may reflect a VPN or remote host city, and sends no file data. Weather requests are cached for 20 minutes. Open-Meteo’s free API is for non-commercial use; see its terms above.
+Version 1.6 moves the clock and weather into one horizontal row on the right and adds resizing from all four edges and corners. Preferred dimensions persist across reloads and capsule toggles, stay within the viewport, and can be reset by double-clicking a resize handle or in Appearance & language. Keyboard resizing is supported. Version 1.5 keeps selection controls in a fixed space, so entering batch selection preserves list position, row height and text width. The centered trash bin releases heart bubbles only after a click. Independent local-clock and automatic-weather switches join file-time preferences. Direct inline renaming, collision protection and the clean filter strip remain available. Chinese/English, local cartoon avatars and outside-click collapse are included. The clock follows the browser computer’s timezone and works offline. Optional weather uses approximate host-IP location from ipapi.co and Open-Meteo data; it may reflect a VPN or remote host city, and sends no file data. Weather requests are cached for 20 minutes. Open-Meteo’s free API is for non-commercial use; see its terms above.
 
 The first 100 file rows render initially, with more appended on scroll; the total remains complete. Content loads when a preview opens, and the collapsed capsule refreshes less often. Moving files to OS trash is recoverable; disk space is reclaimed when the OS trash is emptied. No measured RAM-saving percentage is claimed.
 

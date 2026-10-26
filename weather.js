@@ -29,7 +29,7 @@ export function createWeatherService({ fetch: request = globalThis.fetch, now = 
   let cached = null, inFlight = null, retryAt = 0
   const stale = () => cached && now() - cached.fetchedAt < MAX_STALE_MS ? { ...cached, stale: true } : null
   async function read(url) {
-    const response = await request(url, { headers: { accept: 'application/json', 'user-agent': 'dsh-recent-deliverables/1.5 (+https://github.com/FelixJiashengFu/dsh-recent-deliverables)' },
+    const response = await request(url, { headers: { accept: 'application/json', 'user-agent': 'dsh-recent-deliverables/1.6 (+https://github.com/FelixJiashengFu/dsh-recent-deliverables)' },
       credentials: 'omit', redirect: 'error', signal: AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(10000)]) })
     if (!response.ok) throw unavailable()
     return response.json()

@@ -1,7 +1,7 @@
 {
   "name": "dsh-recent-deliverables",
-  "version": "1.5.0",
-  "description": "A floating file panel for DeepSeek Harness with smooth batch selection, heart-bubble trash, inline renaming, a local clock, optional automatic weather, complete counts and Chinese/English.",
+  "version": "1.6.0",
+  "description": "A resizable floating file panel for DeepSeek Harness: right-aligned clock and weather, smooth batch selection, heart-bubble trash, inline renaming, complete counts and Chinese/English.",
   "type": "module",
   "exports": {
     ".": "./index.js",

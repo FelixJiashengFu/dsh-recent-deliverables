@@ -274,6 +274,9 @@ test('old preferences migrate without losing the filter or drag anchor', () => {
   assert.equal(old.filter, 'pdf')
   assert.equal(old.right, 20)
   assert.equal(old.top, 30)
+  assert.equal(old.size, null)
+  assert.deepEqual(helpers.normalizeUiState({ size: { width: 480, height: 620 } }).size, { width: 480, height: 620 })
+  for (const size of [{ width: -1, height: 400 }, { width: 400, height: Infinity }, { width: "400", height: 300 }]) assert.equal(helpers.normalizeUiState({ size }).size, null)
   assert.equal(old.language, 'auto')
   assert.equal(old.showTime, true)
   assert.equal(old.showClock, false)
@@ -387,6 +390,36 @@ test('weather symbols distinguish day, night, rain, snow, storms and unknown dat
   assert.equal(symbol(97, true).key, 'thunder')
   assert.equal(symbol(null, true).key, 'unknown')
   assert.equal(symbol(999, true).emoji, '—')
+})
+
+test('preferred panel size is bounded by usable viewport and retains room for controls', () => {
+  const fit = new Function(`${extractFunction('fitPanelSize')}\nreturn fitPanelSize`)()
+  assert.deepEqual(fit({ width: 520, height: 640 }, { width: 1200, height: 900 }), { width: 520, height: 640 })
+  assert.deepEqual(fit({ width: 20, height: 20 }, { width: 1200, height: 900 }), { width: 300, height: 280 })
+  assert.deepEqual(fit({ width: 5000, height: 5000 }, { width: 1000, height: 700 }), { width: 984, height: 684 })
+  assert.deepEqual(fit({ width: 520, height: 640 }, { width: 280, height: 240 }), { width: 264, height: 224 })
+})
+
+test('all four resize edges keep the opposite edge anchored', () => {
+  const resize = new Function(`${extractFunction('fitPanelSize')}\n${extractFunction('resizedPanelRect')}\nreturn resizedPanelRect`)()
+  const start = { left: 100, top: 80, width: 400, height: 400 }, viewport = { width: 1000, height: 800 }
+  assert.deepEqual(resize(start, 'e', 120, 0, viewport), { left: 100, top: 80, right: 380, width: 520, height: 400 })
+  assert.deepEqual(resize(start, 'w', -60, 0, viewport), { left: 40, top: 80, right: 500, width: 460, height: 400 })
+  assert.deepEqual(resize(start, 'n', 0, -50, viewport), { left: 100, top: 30, right: 500, width: 400, height: 450 })
+  assert.deepEqual(resize(start, 's', 0, 100, viewport), { left: 100, top: 80, right: 500, width: 400, height: 500 })
+})
+
+test('four resize corners combine axes and stop at minimum sizes or screen edges', () => {
+  const resize = new Function(`${extractFunction('fitPanelSize')}\n${extractFunction('resizedPanelRect')}\nreturn resizedPanelRect`)()
+  const start = { left: 100, top: 80, width: 400, height: 400 }, viewport = { width: 1000, height: 800 }
+  assert.deepEqual(resize(start, 'nw', -100, -100, viewport), { left: 8, top: 8, right: 500, width: 492, height: 472 })
+  assert.deepEqual(resize(start, 'ne', 200, -30, viewport), { left: 100, top: 50, right: 300, width: 600, height: 430 })
+  assert.deepEqual(resize(start, 'sw', -40, 120, viewport), { left: 60, top: 80, right: 500, width: 440, height: 520 })
+  assert.deepEqual(resize(start, 'se', 100, 50, viewport), { left: 100, top: 80, right: 400, width: 500, height: 450 })
+  const small = resize(start, 'nw', 5000, 5000, viewport)
+  assert.equal(small.width, 300); assert.equal(small.height, 280)
+  const large = resize(start, 'se', 5000, 5000, viewport)
+  assert.equal(large.right, 8); assert.equal(large.top + large.height, 792)
 })
 
 for (const { name, fn } of cases) {
